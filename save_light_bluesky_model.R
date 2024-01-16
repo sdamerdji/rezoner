@@ -5,7 +5,7 @@ library(readxl)
 # that can only be used for predictions. This is necessary so the R Shiny App
 # doesn't take forever to load.
 
-sf_history <- read_csv("./Blue Sky Code and Inputs/SF_Logistic_Data.csv")
+sf_history <- read_csv("./SF_Logistic_Data.csv")
 
 model <- glm(Developed ~ Historic + Residential_Dummy + Zillow_Price_Real + 
                Const_FedReserve_Real + Envelope_1000 + Upzone_Ratio + zp_OfficeComm +
