@@ -9,10 +9,10 @@ library(sf)
 library(sfarrow)
 
 ######### Create a dataset for the Fall 2023 rezoning #############
-map4 <- st_read('./Desktop/rezoner2/Fall2023Rezoning.json', promote_to_multi=F)
+map4 <- st_read('~/Desktop/rezoner2/Fall2023Rezoning.json', promote_to_multi=F)
 # The above dataset lacks info on the fourplex rezoning, so I have to separately
 # load the block-level dataset on where fourplexes are allowed now.
-fourplex <- st_read('./Desktop/rezoner2/fourplex_areas_12_2023.geojson')
+fourplex <- st_read('~/Desktop/rezoner2/fourplex_areas_12_2023.geojson')
 fourplex <- st_transform(fourplex, st_crs(map4))
 
 map4 <- map4 %>%
@@ -30,14 +30,14 @@ map4$M4_ZONING[
 
 
 ######### Load and clean sites inventory dataset #############
-sf_sites_inventory <- read_excel("./Desktop/rezoner2/sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
+sf_sites_inventory <- read_excel("~/Desktop/rezoner2/sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
                                  sheet = "Table B -Submitted-Dec-22", 
                                  skip=1, 
                                  na='n/a')
 # I need a spatial join to merge the Fall 2023 dataset with the sites inventory 
 # dataset. Hence, I'm first joining the sites inventory with a geospatial 
 # bluesky dataset.
-sf_history <- st_read('./Desktop/rezoner2/geobluesky.geojson')
+sf_history <- st_read('~/Desktop/rezoner2/geobluesky.geojson')
 sf_history <- st_transform(sf_history, st_crs(map4))
 
 # Clean and join
@@ -88,7 +88,7 @@ merge3 <- sf_history %>%
 
 unmerged3 <- unmerged2[!(merge3$mapblklot %in% merge3$mapblklot),]
 merge4 <- st_join(df, unmerged3,  left='F')
-unmerged4 <- unmerged3[!(unmerged4$mapblklot %in% merge4$mapblklot.y),]
+unmerged4 <- unmerged3[!(unmerged3$mapblklot %in% merge4$mapblklot.y),]
 
 merge1 <- merge1 %>% 
   rename(ACRES=ACRES.x) %>%
