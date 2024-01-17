@@ -7,34 +7,15 @@ library(shinyjs)
 library(sfarrow)
 
 model <- readRDS(file='./light_model.rds')
+pal <- colorBin("viridis",  bins = c(1, 5, 7, 20, Inf), right = F)
 
-#map <- st_read('../geobluesky.geojson')
-#map <- st_read('./small_map.geojson') # just 2016 parcels
+#pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
-#map <- dplyr::select(map, -mapblklot)
-
-#sf_sites_inventory <- read_excel("../sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
-#                                 sheet = "Table B -Submitted-Dec-22", 
-#                                 skip=1, 
-#                                 na='n/a') %>%
-#  mutate(MapBlkLot_Master = stringr::str_replace(mapblklot, "-", ""),
-#         year = 2016) %>%
-#  distinct(MapBlkLot_Master, .keep_all = TRUE) %>%
-#  inner_join(map, by = c('MapBlkLot_Master', "year"))
-# sf_sites_inventory  %>% select(-ends_with("_LI"), -ends_with("_CAP"), -ends_with("_M"), -ends_with("_AM"), -ZIP5, -JURISDICT)
-#                     %>% st_write_feather('./small_joined_map.feather')
-
-#
-pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
-#sf_sites_inventory <- st_read_feather('./small_joined_map.feather')
 sf_sites_inventory <- st_read_feather('./four_rezonings.feather')
 
 
-#sf_sites_inventory <- dplyr::relocate(sf_sites_inventory, geometry)
-
 # Years after rezoning
 n_years <- 5
-
 fourplex <- "Increased density up to four units (six units on corner lots)"
 decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
@@ -188,14 +169,23 @@ generate_plot <- function(df=F, plot_pdev=F) {
   leaflet(sf_sites_inventory) %>%
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
-    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324) %>%
-    addLegend(
-      "bottomright",
-      pal = pal,
-      labels = c("0", "1 - 4", "5 - 9", "10 - 99", "100+"),
-      values = ~ pal(c(0, 10, 100, 500)),
-      title = "Expected Units"
-    )
+    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  %>%
+      addLegend(
+        "bottomright",
+        pal = pal,
+        labels = c("1 - 4", "5 - 7", "8 - 19", "20+"),
+        values = c(1, 5, 7, 20, Inf),
+        title = "Stories"
+      )
+  #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
+
+  #  addLegend(
+  #    "bottomright",
+   #   pal = pal,
+  #    labels = c("0", "1 - 4", "5 - 9", "10 - 99", "100+"),
+  #    values = ~ pal(c(0, 10, 100, 500)),
+  #    title = "Expected Units"
+  #  )
 }
 
 calculate_shortfall <- function(df) {
@@ -224,7 +214,7 @@ ui <- fluidPage(
                          choices = c("Housing Element Rezoning Scenario A" = "A",
                                      "Housing Element Rezoning Scenario B" = "B",
                                      "Housing Element Rezoning Scenario C" = "C",
-                                     "Rezoning from SF's Fall 2023 Rezoning Map" = "D",
+                                     "SF's Fall 2023 Rezoning Map" = "D",
                                      "Take the most ambitious version of everything SF Planning has proposed so far" = "Union", 
                                      "Parisian (5 story buildings in R1 neighborhoods)" = "Parisian",
                                      "Skyscrapers Everywhere" = "Legalize It"),
@@ -275,7 +265,6 @@ server <- function(input, output) {
     to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
     print('start group by')
     start <- Sys.time()
-    to_plot['block']
     to_plot['block'] <- stringr::str_sub(to_plot$mapblklot, 1, 4)
     to_plot <- to_plot %>%
       group_by(block, M3_ZONING) %>%
@@ -283,6 +272,10 @@ server <- function(input, output) {
                 pdev = mean(pdev),
                 expected_units_if_dev = sum(expected_units_if_dev))
     print(Sys.time() - start)
+    to_plot['n_stories'] <- as.numeric(stringr::str_extract(to_plot$M3_ZONING, "\\d+")) %/% 10
+    to_plot[to_plot$M3_ZONING == fourplex, 'n_stories'] <- 4
+    to_plot[to_plot$M3_ZONING == decontrol, 'n_stories'] <- 4
+    to_plot <- st_sf(to_plot)
     
     print('finish group by')
     start <- Sys.time()
@@ -290,9 +283,9 @@ server <- function(input, output) {
                  data = to_plot) %>%
       clearGroup('parcels') %>%
       addPolygons(
-        fillColor = ~ pal(expected_units),
-        color = ~ pal(expected_units),
-        fillOpacity = .8,
+        fillColor = ~ pal(n_stories),
+        color = ~ pal(n_stories),
+        fillOpacity = 1,
         weight = 1,
         group = 'parcels',
         popup = ~ paste(
