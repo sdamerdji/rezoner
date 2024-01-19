@@ -11,7 +11,8 @@ pal <- colorBin("viridis",  bins = c(1, 5, 7, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
-sf_sites_inventory <- st_read_feather('./four_rezonings.feather')
+sf_sites_inventory <- st_read_feather('./four_rezonings_v2.feather')
+geometries <- st_read_feather('./simple_geometries.feather')
 
 
 # Years after rezoning
@@ -53,11 +54,11 @@ union_of_maxdens <- function(df) {
                TRUE ~ M3_ZONING
              )) %>%
      mutate(M3_ZONING = 
-                      case_when(
-                        as.numeric(stringr::str_extract(M4_ZONING, "\\d+")) > as.numeric(stringr::str_extract(M3_ZONING,  "\\d+")) ~ M4_ZONING,
-                        !is.na(as.numeric(stringr::str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M4_ZONING,
-                        TRUE ~ M3_ZONING
-                        )
+              case_when(
+                as.numeric(stringr::str_extract(M4_ZONING, "\\d+")) > as.numeric(stringr::str_extract(M3_ZONING,  "\\d+")) ~ M4_ZONING,
+                !is.na(as.numeric(stringr::str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M4_ZONING,
+                TRUE ~ M3_ZONING
+                )
     )
 }
 
@@ -266,17 +267,19 @@ server <- function(input, output) {
     print('start group by')
     start <- Sys.time()
     to_plot['block'] <- stringr::str_sub(to_plot$mapblklot, 1, 4)
+    to_plot <- st_drop_geometry(to_plot)
     to_plot <- to_plot %>%
-      group_by(block, M3_ZONING) %>%
+      group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING) %>%
       summarise(expected_units = sum(expected_units),
                 pdev = mean(pdev),
                 expected_units_if_dev = sum(expected_units_if_dev))
+    to_plot <- st_sf(left_join(to_plot, geometries))
     print(Sys.time() - start)
     to_plot['n_stories'] <- as.numeric(stringr::str_extract(to_plot$M3_ZONING, "\\d+")) %/% 10
     to_plot[to_plot$M3_ZONING == fourplex, 'n_stories'] <- 4
     to_plot[to_plot$M3_ZONING == decontrol, 'n_stories'] <- 4
     to_plot <- st_sf(to_plot)
-    
+    to_plot <- st_cast(to_plot, "MULTIPOLYGON")
     print('finish group by')
     start <- Sys.time()
     leafletProxy("mainPlot", 
