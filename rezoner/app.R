@@ -2,7 +2,7 @@ library(shiny)
 library(dplyr)
 library(sf)
 library(leaflet)
-library(waiter)
+#library(waiter)
 library(shinyjs)
 library(sfarrow)
 
@@ -80,11 +80,11 @@ height_setter <- function(ZONING, height) {
 
 
 upzone <- function(df) {
-  print('upzoning... kinda a fake name')
-  print('sum(df$expected_units, na.rm=F)')
-  print(sum(df$expected_units, na.rm=F))
-  print('sum(df$expected_units, na.rm=T)')
-  print(sum(df$expected_units, na.rm=T))
+  # print('upzoning... kinda a fake name')
+  # print('sum(df$expected_units, na.rm=F)')
+  # print(sum(df$expected_units, na.rm=F))
+  # print('sum(df$expected_units, na.rm=T)')
+  # print(sum(df$expected_units, na.rm=T))
   (total_expected_units <- sum(df$expected_units, na.rm=T))
 }
 
@@ -170,14 +170,11 @@ update_df <- function(scenario) {
     mutate(pdev = 1 - (1-predictions.16)^n_years) %>% 
     mutate(expected_units = pdev * expected_units_if_dev)
   
-  print('complete df update')
-  print(Sys.time() - start)
+  print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
 }
 
 generate_plot <- function() {
-  print('render leaflet')
-  
   leaflet(df) %>%
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
@@ -207,7 +204,7 @@ calculate_shortfall <- function(df) {
 
 # UI definition
 ui <- fluidPage(
-  useWaiter(), # include dependencies
+  #useWaiter(), # include dependencies
   shinyjs::useShinyjs(),  # Initialize shinyjs
   id = "main_content",
   tags$head(
@@ -286,15 +283,15 @@ server <- function(input, output) {
   
   observe({
     df <- updatedData()  # Get the updated data
-    waiter::transparent(0)
-    waiter_show(# show the waiter
-      id = "mainPlot",
-      html = div(
-        spin_1(),
-        h3("Upzoning San Francisco - the EIR will take a second!"),
-        color=  waiter::transparent(0)
-
-      ))
+    # waiter::transparent(0)
+    # waiter_show(# show the waiter
+    #   id = "mainPlot",
+    #   html = div(
+    #     spin_1(),
+    #     h3("Upzoning San Francisco - the EIR will take a second!"),
+    #     color=  waiter::transparent(0)
+    # 
+    #   ))
     
     #df <- filter(df, (M3_ZONING != 'No Change') & !is.na(M3_ZONING))
     
@@ -310,14 +307,16 @@ server <- function(input, output) {
       group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
       summarise(expected_units = sum(expected_units),
                 pdev = mean(pdev),
-                expected_units_if_dev = sum(expected_units_if_dev))
-    to_plot <- st_sf(left_join(to_plot, geometries))
+                expected_units_if_dev = sum(expected_units_if_dev),
+                .groups='keep')
+    to_plot <- st_sf(left_join(to_plot, geometries, 
+                               by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
     to_plot$n_stories <- as.numeric(stringr::str_extract(to_plot$ZONING, "\\d+")) %/% 10
     to_plot[to_plot$ZONING == fourplex, 'n_stories'] <- 4
     to_plot[to_plot$ZONING == decontrol, 'n_stories'] <- 4
     to_plot <- st_sf(to_plot)
     to_plot <- st_cast(to_plot, "MULTIPOLYGON")
-    print(paste0('Group by took: ', Sys.time() - start))
+    print(paste0('Group by took: ', round(Sys.time() - start, 1)))
     
     # Render
     start <- Sys.time()
@@ -347,7 +346,7 @@ server <- function(input, output) {
           direction = "auto"
         )
       )
-    print(paste0('Rendering took: ', Sys.time() - start))
+    print(paste0('Rendering took: ', round(Sys.time() - start, 1)))
     waiter_hide() # hide the waiter
     
   })
