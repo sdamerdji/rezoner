@@ -5,9 +5,10 @@ library(leaflet)
 #library(waiter)
 library(shinyjs)
 library(sfarrow)
+library(stringr)
 
 model <- readRDS(file='./light_model.rds')
-pal <- colorBin("viridis",  bins = c(1, 5, 7, 20, Inf), right = F)
+pal <- colorBin("viridis",  bins = c(1, 5, 7, 10, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
@@ -25,9 +26,13 @@ skyscrapers <-  "300' Height Allowed"
 
 parisian <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
-  parisian <- "55' Height Allowed"
+  parisian <- "75' Height Allowed"
   df[(!is.na(df$ZONING)) & df$ZONING == fourplex, 'ZONING'] <- parisian
   df[(!is.na(df$ZONING)) & df$ZONING == decontrol, 'ZONING'] <- parisian
+  df[(!is.na(df$ZONING))
+     & as.numeric(str_extract(df$ZONING, "\\d+")) < 75, 'ZONING'] <- parisian
+  
+  # This just ensures it's one of the parcels in an existing SF rezoning map
   df[is.na(df$ZONING) & (!is.na(df$M1_ZONING)| 
                           !is.na(df$M2_ZONING)|
                            !is.na(df$M3_ZONING)|
@@ -45,27 +50,27 @@ union_of_maxdens <- function(df) {
   df %>% 
     mutate(ZONING =
              case_when(
-               as.numeric(stringr::str_extract(M1_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M1_ZONING,
-               !is.na(as.numeric(stringr::str_extract(M1_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M1_ZONING,
+               as.numeric(str_extract(M1_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M1_ZONING,
+               !is.na(as.numeric(str_extract(M1_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(M3_ZONING,  "\\d+"))) ~ M1_ZONING,
                TRUE ~ M1_ZONING
              )) %>%
     mutate(ZONING = 
              case_when(
-               as.numeric(stringr::str_extract(M2_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M2_ZONING,
-               !is.na(as.numeric(stringr::str_extract(M2_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M2_ZONING,
+               as.numeric(str_extract(M2_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M2_ZONING,
+               !is.na(as.numeric(str_extract(M2_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M2_ZONING,
                TRUE ~ ZONING
              )) %>%
     mutate(ZONING = 
              case_when(
-               as.numeric(stringr::str_extract(M3_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M3_ZONING,
-               !is.na(as.numeric(stringr::str_extract(M3_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M3_ZONING,
+               as.numeric(str_extract(M3_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M3_ZONING,
+               !is.na(as.numeric(str_extract(M3_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M3_ZONING,
                TRUE ~ ZONING
              )
     ) %>%
      mutate(ZONING = 
               case_when(
-                as.numeric(stringr::str_extract(M4_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M4_ZONING,
-                !is.na(as.numeric(stringr::str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M4_ZONING,
+                as.numeric(str_extract(M4_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M4_ZONING,
+                !is.na(as.numeric(str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M4_ZONING,
                 TRUE ~ ZONING
                 )
     )
@@ -136,7 +141,7 @@ update_df <- function(scenario) {
   
   df <- df %>%
     mutate(zp_DensRestMulti = if_else(ZONING == fourplex | ZONING == 'No Change', 1, zp_DensRestMulti)) %>%
-    mutate(height = as.numeric(stringr::str_extract(ZONING, "\\d+"))) %>%
+    mutate(height = as.numeric(str_extract(ZONING, "\\d+"))) %>%
     mutate(height = height_setter(ZONING, height)) %>%
     mutate(
       # Calculate envelope_1000_new based on ACRES and height
@@ -146,6 +151,8 @@ update_df <- function(scenario) {
         ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
         TRUE ~ NA_real_
       ),
+      # no downzoning allowed
+      Envelope_1000_new = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
       existing_sqft = Envelope_1000 / Upzone_Ratio,
       Upzone_Ratio_new = Envelope_1000_new / existing_sqft
     ) %>%
@@ -182,8 +189,8 @@ generate_plot <- function() {
       addLegend(
         "bottomright",
         pal = pal,
-        labels = c("1 - 4", "5 - 7", "8 - 19", "20+"),
-        values = c(1, 5, 7, 20, Inf),
+        labels = c("1 - 4", "5 - 7", "8 - 10", '10-19', "20+"),
+        values = c(1, 5, 7, 10, 20, Inf),
         title = "Stories"
       )
   #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
@@ -234,14 +241,14 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       radioButtons("scenario", "Upzoning Strategies:",
-                         choices = c("Housing Element Rezoning Scenario A" = "A",
+                         choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "D",
+                                     "Housing Element Rezoning Scenario A" = "A",
                                      "Housing Element Rezoning Scenario B" = "B",
                                      "Housing Element Rezoning Scenario C" = "C",
-                                     "SF's Fall 2023 Rezoning Map" = "D",
-                                     "Take the most ambitious version of everything SF Planning has proposed so far" = "Union", 
-                                     "Parisian (5 story buildings in R1 neighborhoods)" = "Parisian",
+                                     "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
+                                     "Parisian zoning in low density neighborhoods" = "Parisian",
                                      "Skyscrapers Everywhere" = "Legalize It"),
-                         selected = 'A'),
+                         selected = 'D'),
       # New components for map customization
       radioButtons("customize_map", "Customize this rezoning:",
                    choices = c("No" = "no", "Yes" = "yes"),
@@ -301,7 +308,7 @@ server <- function(input, output) {
     
     # Group by
     start <- Sys.time()
-    to_plot['block'] <- stringr::str_sub(to_plot$mapblklot, 1, 4)
+    to_plot['block'] <- str_sub(to_plot$mapblklot, 1, 4)
     to_plot <- st_drop_geometry(to_plot)
     to_plot <- to_plot %>%
       group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
@@ -311,7 +318,7 @@ server <- function(input, output) {
                 .groups='keep')
     to_plot <- st_sf(left_join(to_plot, geometries, 
                                by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
-    to_plot$n_stories <- as.numeric(stringr::str_extract(to_plot$ZONING, "\\d+")) %/% 10
+    to_plot$n_stories <- as.numeric(str_extract(to_plot$ZONING, "\\d+")) %/% 10
     to_plot[to_plot$ZONING == fourplex, 'n_stories'] <- 4
     to_plot[to_plot$ZONING == decontrol, 'n_stories'] <- 4
     to_plot <- st_sf(to_plot)
@@ -358,16 +365,16 @@ server <- function(input, output) {
     updated_help <- paste(
       "Initial shortfall: 36,282 units. \nYou helped build: ",
       formatC(added_capacity, format="f", big.mark=",", digits=0),
-      " new units by 2031."
+      "new units by 2031."
     )
     congrats <- paste("\nYOU MET THE GOAL AND ADDED AN EXTRA", 
                       formatC(added_capacity - 36282, 
                               format="f", big.mark=",", digits=0),
                       "HOMES GO TEAM")
-    sad <-paste("\nThe remaining shortfall is: ",
+    sad <-paste("\nThe remaining shortfall is:",
                          formatC(36282 - added_capacity, 
                                  format="f", big.mark=",", digits=0),
-                ' units.')
+                'units.')
 
     if (added_capacity > 36282) {
       result <- paste(updated_help, congrats)
