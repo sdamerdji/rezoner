@@ -11,7 +11,8 @@ pal <- colorBin("viridis",  bins = c(1, 5, 7, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
-sf_sites_inventory <- st_read_feather('./four_rezonings_v2.feather')
+df <- st_read_feather('./four_rezonings_v2.feather')
+df['ZONING'] <- NA
 geometries <- st_read_feather('./simple_geometries.feather')
 
 
@@ -25,46 +26,54 @@ skyscrapers <-  "300' Height Allowed"
 parisian <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
   parisian <- "55' Height Allowed"
-  df[(!is.na(df$M3_ZONING)) & df$M3_ZONING == fourplex, 'M3_ZONING'] <- parisian
-  df[(!is.na(df$M3_ZONING)) & df$M3_ZONING == decontrol, 'M3_ZONING'] <- parisian
-  df[is.na(df$M3_ZONING) & (!is.na(df$M1_ZONING)| 
-                             !is.na(df$M2_ZONING)|
-                              !is.na(df$M4_ZONING)), 'M3_ZONING'] <- parisian
+  df[(!is.na(df$ZONING)) & df$ZONING == fourplex, 'ZONING'] <- parisian
+  df[(!is.na(df$ZONING)) & df$ZONING == decontrol, 'ZONING'] <- parisian
+  df[is.na(df$ZONING) & (!is.na(df$M1_ZONING)| 
+                          !is.na(df$M2_ZONING)|
+                           !is.na(df$M3_ZONING)|
+                              !is.na(df$M4_ZONING)), 'ZONING'] <- parisian
   df
 }
 
 legalize_it <- function(df) {
-  df[, 'M3_ZONING'] <- skyscrapers
+  df[, 'ZONING'] <- skyscrapers
   df
 }
 
 union_of_maxdens <- function(df) {
   # Set M3 Zoning to be maximum upzoning of M1 and M2. Surely this is covered by EIR
   df %>% 
-    mutate(M3_ZONING =
+    mutate(ZONING =
              case_when(
-               as.numeric(stringr::str_extract(M1_ZONING, "\\d+")) > as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))  ~ M1_ZONING,
+               as.numeric(stringr::str_extract(M1_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M1_ZONING,
                !is.na(as.numeric(stringr::str_extract(M1_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M1_ZONING,
-               TRUE ~ M3_ZONING
+               TRUE ~ M1_ZONING
              )) %>%
-    mutate(M3_ZONING = 
+    mutate(ZONING = 
              case_when(
-               as.numeric(stringr::str_extract(M2_ZONING, "\\d+")) > as.numeric(stringr::str_extract(M3_ZONING,  "\\d+")) ~ M2_ZONING,
-               !is.na(as.numeric(stringr::str_extract(M2_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M2_ZONING,
-               TRUE ~ M3_ZONING
+               as.numeric(stringr::str_extract(M2_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M2_ZONING,
+               !is.na(as.numeric(stringr::str_extract(M2_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M2_ZONING,
+               TRUE ~ ZONING
              )) %>%
-     mutate(M3_ZONING = 
+    mutate(ZONING = 
+             case_when(
+               as.numeric(stringr::str_extract(M3_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M3_ZONING,
+               !is.na(as.numeric(stringr::str_extract(M3_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M3_ZONING,
+               TRUE ~ ZONING
+             )
+    ) %>%
+     mutate(ZONING = 
               case_when(
-                as.numeric(stringr::str_extract(M4_ZONING, "\\d+")) > as.numeric(stringr::str_extract(M3_ZONING,  "\\d+")) ~ M4_ZONING,
-                !is.na(as.numeric(stringr::str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(M3_ZONING,  "\\d+"))) ~ M4_ZONING,
-                TRUE ~ M3_ZONING
+                as.numeric(stringr::str_extract(M4_ZONING, "\\d+")) > as.numeric(stringr::str_extract(ZONING,  "\\d+")) ~ M4_ZONING,
+                !is.na(as.numeric(stringr::str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(stringr::str_extract(ZONING,  "\\d+"))) ~ M4_ZONING,
+                TRUE ~ ZONING
                 )
     )
 }
 
-height_setter <- function(M3_ZONING, height) {
+height_setter <- function(ZONING, height) {
   dplyr::case_when(
-    !is.na(M3_ZONING) & is.na(height) ~ 40,
+    !is.na(ZONING) & is.na(height) ~ 40,
     .default = height
   )
 }
@@ -84,25 +93,25 @@ update_df <- function(scenario) {
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
   print(scenario)
-  df <- sf_sites_inventory
-  
+  start <- Sys.time()
+
   if (scenario == 'A') {
-    df[, 'M3_ZONING'] <- df$M1_ZONING
-    df[, 'M3_MAXDENS'] <- df$M1_MAXDENS
+    df['ZONING'] <- df$M1_ZONING
+    df['MAXDENS'] <- df$M1_MAXDENS
   }
   if (scenario == 'B') {
-    df[, 'M3_ZONING'] <- df$M2_ZONING
-    df[, 'M3_MAXDENS'] <- df$M2_MAXDENS
+    df['ZONING'] <- df$M2_ZONING
+    df['MAXDENS'] <- df$M2_MAXDENS
   }
   if (scenario == 'C') {
-    df[, 'M3_ZONING'] <- df$M3_ZONING
-    df[, 'M3_MAXDENS'] <- df$M3_MAXDENS
+    df['ZONING'] <- df$M3_ZONING
+    df['MAXDENS'] <- df$M3_MAXDENS
   }
   if (scenario == 'D') {
-    df[, 'M3_ZONING'] <- df$M4_ZONING
+    df['ZONING'] <- df$M4_ZONING
   }
   if (scenario == 'Union') {
-    df = union_of_maxdens(df)
+    df <- union_of_maxdens(df)
   }
   if (scenario == 'Parisian') {
     df <- union_of_maxdens(df)
@@ -112,23 +121,23 @@ update_df <- function(scenario) {
     df <- legalize_it(df)
   }
   # Erase existing zoning indicators for rezoned parcels
-  df[!is.na(df$M3_ZONING), 
-     grep("^zp", names(sf_sites_inventory), value = TRUE)
+  df[!is.na(df$ZONING), 
+     grep("^zp", names(df), value = TRUE)
      ] <- 0
   
   # So I don't have to handle missing values
-  df[is.na(df$M3_ZONING), 'M3_ZONING'] <- 'No Change'
+  df[is.na(df$ZONING), 'ZONING'] <- 'No Change'
   
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
-    mutate(zp_FormBasedMulti = if_else(!(M3_ZONING == 'No Change' | M3_ZONING == fourplex),
+    mutate(zp_FormBasedMulti = if_else(!(ZONING == 'No Change' | ZONING == fourplex),
                                        1,
                                        zp_FormBasedMulti))
   
   df <- df %>%
-    mutate(zp_DensRestMulti = if_else(M3_ZONING == fourplex | M3_ZONING == 'No Change', 1, zp_DensRestMulti)) %>%
-    mutate(height = as.numeric(stringr::str_extract(M3_ZONING, "\\d+"))) %>%
-    mutate(height = height_setter(M3_ZONING, height)) %>%
+    mutate(zp_DensRestMulti = if_else(ZONING == fourplex | ZONING == 'No Change', 1, zp_DensRestMulti)) %>%
+    mutate(height = as.numeric(stringr::str_extract(ZONING, "\\d+"))) %>%
+    mutate(height = height_setter(ZONING, height)) %>%
     mutate(
       # Calculate envelope_1000_new based on ACRES and height
       Envelope_1000_new = case_when(
@@ -141,17 +150,17 @@ update_df <- function(scenario) {
       Upzone_Ratio_new = Envelope_1000_new / existing_sqft
     ) %>%
     mutate(
-      Envelope_1000 = if_else(!(M3_ZONING == 'No Change'), Envelope_1000_new, Envelope_1000),
-      Upzone_Ratio = if_else(!(M3_ZONING == 'No Change'), Upzone_Ratio_new, Upzone_Ratio)
+      Envelope_1000 = if_else(!(ZONING == 'No Change'), Envelope_1000_new, Envelope_1000),
+      Upzone_Ratio = if_else(!(ZONING == 'No Change'), Upzone_Ratio_new, Upzone_Ratio)
     ) %>%
-    mutate(expected_units_if_dev = ifelse(M3_ZONING != 'No Change', 
+    mutate(expected_units_if_dev = ifelse(ZONING != 'No Change', 
                                           Envelope_1000 * 1000 * 0.8 / 850, 0))
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
     df <- df %>%
-      mutate(M3_MAXDENS = abs(M3_MAXDENS)) %>%
-      mutate(du_allowed = ACRES * M3_MAXDENS) %>%
+      mutate(MAXDENS = abs(MAXDENS)) %>%
+      mutate(du_allowed = ACRES * MAXDENS) %>%
       mutate(expected_units_if_dev = ifelse((!is.na(du_allowed)) & (expected_units_if_dev > du_allowed),
                                                 du_allowed, expected_units_if_dev))
   }
@@ -161,13 +170,15 @@ update_df <- function(scenario) {
     mutate(pdev = 1 - (1-predictions.16)^n_years) %>% 
     mutate(expected_units = pdev * expected_units_if_dev)
   
+  print('complete df update')
+  print(Sys.time() - start)
   return(df)
 }
 
-generate_plot <- function(df=F, plot_pdev=F) {
+generate_plot <- function() {
   print('render leaflet')
   
-  leaflet(sf_sites_inventory) %>%
+  leaflet(df) %>%
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
     setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  %>%
@@ -190,7 +201,6 @@ generate_plot <- function(df=F, plot_pdev=F) {
 }
 
 calculate_shortfall <- function(df) {
-  print('calculating shortfall')
   df2 <- select(df, -geometry)
   return(upzone(df2))
 }
@@ -288,26 +298,28 @@ server <- function(input, output) {
     
     #df <- filter(df, (M3_ZONING != 'No Change') & !is.na(M3_ZONING))
     
-    print(filter(df, (M3_ZONING == 'No Change') | is.na(M3_ZONING)) %>% nrow())
-    print(table(filter(df, (M3_ZONING == 'No Change') | is.na(M3_ZONING))$expected_units))
+    #print(filter(df, (ZONING == 'No Change') | is.na(ZONING)) %>% nrow())
+    #print(table(filter(df, (ZONING == 'No Change') | is.na(ZONING))$expected_units))
     to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
-    print('start group by')
+    
+    # Group by
     start <- Sys.time()
     to_plot['block'] <- stringr::str_sub(to_plot$mapblklot, 1, 4)
     to_plot <- st_drop_geometry(to_plot)
     to_plot <- to_plot %>%
-      group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING) %>%
+      group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
       summarise(expected_units = sum(expected_units),
                 pdev = mean(pdev),
                 expected_units_if_dev = sum(expected_units_if_dev))
     to_plot <- st_sf(left_join(to_plot, geometries))
-    print(Sys.time() - start)
-    to_plot['n_stories'] <- as.numeric(stringr::str_extract(to_plot$M3_ZONING, "\\d+")) %/% 10
-    to_plot[to_plot$M3_ZONING == fourplex, 'n_stories'] <- 4
-    to_plot[to_plot$M3_ZONING == decontrol, 'n_stories'] <- 4
+    to_plot$n_stories <- as.numeric(stringr::str_extract(to_plot$ZONING, "\\d+")) %/% 10
+    to_plot[to_plot$ZONING == fourplex, 'n_stories'] <- 4
+    to_plot[to_plot$ZONING == decontrol, 'n_stories'] <- 4
     to_plot <- st_sf(to_plot)
     to_plot <- st_cast(to_plot, "MULTIPOLYGON")
-    print('finish group by')
+    print(paste0('Group by took: ', Sys.time() - start))
+    
+    # Render
     start <- Sys.time()
     leafletProxy("mainPlot", 
                  data = to_plot) %>%
@@ -320,7 +332,7 @@ server <- function(input, output) {
         group = 'parcels',
         popup = ~ paste(
           "New Zoning:",
-          M3_ZONING,
+          ZONING,
           "<br>Expected Units:",
           formatC(round(expected_units, 1), format='f', big.mark=',', digits=1),
           '<br>P(Dev):',
@@ -335,7 +347,7 @@ server <- function(input, output) {
           direction = "auto"
         )
       )
-    print(Sys.time() - start)
+    print(paste0('Rendering took: ', Sys.time() - start))
     waiter_hide() # hide the waiter
     
   })
