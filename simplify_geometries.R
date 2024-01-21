@@ -14,14 +14,18 @@ df <- st_read_feather('./four_rezonings.feather')
 block_zones <- df %>% 
   mutate(block = stringr::str_sub(MapBlkLot_Master, 1, 4)) %>%
   dplyr::group_by(M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, block) %>%
-  summarise() 
+  summarise(.groups='keep') %>%
+  ungroup()
 #block_zones <- st_union(block_zones, by_feature=T)
-#block_zones <- st_cast(block_zones, "POLYGON")
+block_zones <- st_cast(block_zones, "MULTIPOLYGON")
 #block_zones <- st_make_valid(block_zones)
 #block_zones <- st_make_valid(block_zones)
 block_zones <- st_make_valid(block_zones, 'MULTIPOLYGON')
 print(sum(st_area(block_zones)))
-block_simple <- st_simplify(block_zones, dTolerance=5)
+block_simple <- rmapshaper::ms_simplify(block_zones, keep=.1) #, keep_shapes=T
+block_simple <- st_make_valid(block_simple, 'MULTIPOLYGON')
+
+#block_simple <- st_simplify(block_zones, dTolerance=10)
 print(sum(st_area(block_simple)))
 block_simple['primary_key'] = 1:nrow(block_simple)
 block_simple <- st_sf(block_simple)

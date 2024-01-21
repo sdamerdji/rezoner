@@ -186,22 +186,13 @@ generate_plot <- function() {
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
     setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  %>%
-      addLegend(
-        "bottomright",
-        pal = pal,
-        labels = c("1 - 4", "5 - 7", "8 - 10", '10-19', "20+"),
-        values = c(1, 5, 8, 10, 20),
-        title = "Stories"
-      )
-  #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
-
-  #  addLegend(
-  #    "bottomright",
-   #   pal = pal,
-  #    labels = c("0", "1 - 4", "5 - 9", "10 - 99", "100+"),
-  #    values = ~ pal(c(0, 10, 100, 500)),
-  #    title = "Expected Units"
-  #  )
+    addLegend(
+      "bottomright",
+      title = "Stories",
+      colors = pal(c(1, 5, 8, 10, 20)),
+      labels = c("1 - 4", "5 - 7", "8 - 9", "10 - 19", "20+"),
+      opacity = 0.5
+    )
 }
 
 calculate_shortfall <- function(df) {
@@ -354,7 +345,7 @@ server <- function(input, output) {
         )
       )
     print(paste0('Rendering took: ', round(Sys.time() - start, 1)))
-    waiter_hide() # hide the waiter
+    #waiter_hide() # hide the waiter
     
   })
   
