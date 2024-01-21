@@ -240,18 +240,19 @@ ui <- fluidPage(
                                      "Parisian zoning in low density neighborhoods" = "Parisian",
                                      "Skyscrapers everywhere" = "Legalize It"),
                          selected = 'D'),
-      # New components for map customization
       radioButtons("customize_map", "Customize this rezoning:",
                    choices = c("No" = "no", "Yes" = "yes"),
                    selected = "no"),
-      
       conditionalPanel(
         condition = "input.customize_map == 'yes'",
         radioButtons("stories", "Select number of stories:",
                      choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
                      selected = NULL),
-        actionButton("reset_map", "Reset", icon = icon("sync"))
+        actionButton("reset_map", "Reset", icon = icon("sync")),
       ),
+      HTML("<b>Overlay options:</b>"),
+      checkboxInput("lldl", "Overlay large, low density lots (outside low opportunity tract)"),
+      checkboxInput("affh", "Overlay high opportunity tracts per Draft 2024 TCAC Map"),
       position = "bottom-left"
     ),
     mainPanel(
@@ -277,6 +278,34 @@ server <- function(input, output) {
   
   output$mainPlot <- renderLeaflet({
     generate_plot()
+  })
+  
+  observe({
+    overlay <- input$lldl
+    multipolygon <- readRDS('./growth.RDS')
+    if (overlay) {
+      # Add the multipolygon layer when overlay is TRUE
+      leafletProxy("mainPlot") %>%
+        addPolygons(data = multipolygon, fill = NA, group="lldl", weight=.5)
+
+    } else {
+      leafletProxy("mainPlot") %>%
+        clearGroup("lldl")
+    }
+  })
+  
+  observe({
+    overlay <- input$affh
+    multipolygon <- readRDS('./high_opp.RDS')
+    if (overlay) {
+      # Add the multipolygon layer when overlay is TRUE
+      leafletProxy("mainPlot") %>%
+        addPolygons(data = multipolygon, fill = NA, group="affh", color='black', weight=1)
+
+    } else {
+      leafletProxy("mainPlot") %>%
+        clearGroup("affh")
+    }
   })
   
   observe({
