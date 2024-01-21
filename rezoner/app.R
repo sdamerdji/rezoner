@@ -105,7 +105,7 @@ update_df <- function(scenario) {
     df = union_of_maxdens(df)
   }
   if (scenario == 'Parisian') {
-    df = union_of_maxdens(df)
+    df <- union_of_maxdens(df)
     df <- parisian(df)
   }
   if (scenario == 'Legalize It') {
@@ -199,6 +199,7 @@ calculate_shortfall <- function(df) {
 ui <- fluidPage(
   useWaiter(), # include dependencies
   shinyjs::useShinyjs(),  # Initialize shinyjs
+  id = "main_content",
   tags$head(
     tags$script(src = "./js-confetti.browser.js"),
     tags$script(HTML("
@@ -206,9 +207,23 @@ ui <- fluidPage(
       document.addEventListener('DOMContentLoaded', function() {
         jsConfettiInstance = new JSConfetti(); // Instantiate when the document is ready
       });
+      
+      // Define the sprayConfetti function
+      function sprayConfetti() {
+        for (var i = 0; i < 2; i++) {
+            setTimeout(function() {
+                jsConfettiInstance.addConfetti();
+            }, 1000 * i); // Delay of 1 second (1000 milliseconds) between each spray
+        }
+      }
     "))
   ),
-  titlePanel("Upzone the City"),
+  tags$head(
+    tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
+  ),
+  titlePanel(
+    "Upzone the City"
+  ),
   sidebarLayout(
     sidebarPanel(
       radioButtons("scenario", "Upzoning Strategies:",
@@ -220,6 +235,18 @@ ui <- fluidPage(
                                      "Parisian (5 story buildings in R1 neighborhoods)" = "Parisian",
                                      "Skyscrapers Everywhere" = "Legalize It"),
                          selected = 'A'),
+      # New components for map customization
+      radioButtons("customize_map", "Customize this rezoning:",
+                   choices = c("No" = "no", "Yes" = "yes"),
+                   selected = "no"),
+      
+      conditionalPanel(
+        condition = "input.customize_map == 'yes'",
+        radioButtons("stories", "Select number of stories:",
+                     choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
+                     selected = NULL),
+        actionButton("reset_map", "Reset", icon = icon("sync"))
+      ),
       position = "bottom-left"
     ),
     mainPanel(
@@ -247,7 +274,7 @@ server <- function(input, output) {
     generate_plot()
   })
   
-  observeEvent(input$scenario, {
+  observe({
     df <- updatedData()  # Get the updated data
     waiter::transparent(0)
     waiter_show(# show the waiter
@@ -334,14 +361,22 @@ server <- function(input, output) {
     if (added_capacity > 36282) {
       result <- paste(updated_help, congrats)
       
-      for (i in 1:5) {
-        Sys.sleep(1)
-        shinyjs::runjs("jsConfettiInstance.addConfetti();") # Use the instance to add confetti
-      }
+      shinyjs::runjs("sprayConfetti();")
+      
     } else {
       result <- paste(updated_help, sad)
     }
     return(result)
+  })
+  
+  observe({
+    if(input$customize_map == "yes") {
+      # Change cursor to paint roller
+      shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
+    } else {
+      # Revert cursor to default
+      shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
+    }
   })
   
 }
