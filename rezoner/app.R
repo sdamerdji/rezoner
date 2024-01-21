@@ -8,7 +8,7 @@ library(sfarrow)
 library(stringr)
 
 model <- readRDS(file='./light_model.rds')
-pal <- colorBin("viridis",  bins = c(1, 5, 7, 10, 20, Inf), right = F)
+pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
@@ -190,7 +190,7 @@ generate_plot <- function() {
         "bottomright",
         pal = pal,
         labels = c("1 - 4", "5 - 7", "8 - 10", '10-19', "20+"),
-        values = c(1, 5, 7, 10, 20, Inf),
+        values = c(1, 5, 8, 10, 20),
         title = "Stories"
       )
   #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
@@ -247,7 +247,7 @@ ui <- fluidPage(
                                      "Housing Element Rezoning Scenario C" = "C",
                                      "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
                                      "Parisian zoning in low density neighborhoods" = "Parisian",
-                                     "Skyscrapers Everywhere" = "Legalize It"),
+                                     "Skyscrapers everywhere" = "Legalize It"),
                          selected = 'D'),
       # New components for map customization
       radioButtons("customize_map", "Customize this rezoning:",
