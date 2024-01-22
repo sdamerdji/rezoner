@@ -22,11 +22,12 @@ n_years <- 5
 fourplex <- "Increased density up to four units (six units on corner lots)"
 decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
+parisian_height <- 75
+parisian <- paste0(parisian_height, "' Height Allowed")
 
-
-parisian <- function(df) {
+paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
-  parisian <- "75' Height Allowed"
+
   df[(!is.na(df$ZONING)) & df$ZONING == fourplex, 'ZONING'] <- parisian
   df[(!is.na(df$ZONING)) & df$ZONING == decontrol, 'ZONING'] <- parisian
   df[(!is.na(df$ZONING))
@@ -93,10 +94,11 @@ upzone <- function(df) {
   (total_expected_units <- sum(df$expected_units, na.rm=T))
 }
 
-update_df <- function(scenario) {
+update_df <- function(scenario, extend_affh, extend_econ) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
+  # if extend affh, then where high opp but not already upzoned, upzone to either floor (fourplex) or height + 20
   print(scenario)
   start <- Sys.time()
 
@@ -120,10 +122,59 @@ update_df <- function(scenario) {
   }
   if (scenario == 'Parisian') {
     df <- union_of_maxdens(df)
-    df <- parisian(df)
+    df <- paris(df)
   }
   if (scenario == 'Legalize It') {
     df <- legalize_it(df)
+  }
+  else {
+  if (extend_affh == TRUE) {
+    # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & high_opportunity 
+                              & is_fourplex_floor & ex_height2024 <= 40,
+                              fourplex)) %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & high_opportunity 
+                              & is_fourplex_floor & ex_height2024 > 40,
+                              paste0(ex_height2024 + 20, "' Height Allowed")))
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = replace(ZONING, 
+              is.na(ZONING) & high_opportunity &
+                !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+              parisian)) %>%
+      mutate(ZONING = replace(ZONING, 
+              is.na(ZONING) & high_opportunity & 
+                !(is_fourplex_floor) & ex_height2024 > parisian_height,
+              paste0(ex_height2024 + 20, "' Height Allowed")))
+  }
+  if (extend_econ == TRUE) {
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & !is.na(econ_affh) & (econ_affh > .9 ) 
+                              & is_fourplex_floor & ex_height2024 <= 40,
+                              fourplex)) %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & !is.na(econ_affh) & (econ_affh > .9 )  
+                              & is_fourplex_floor & ex_height2024 > 40,
+                              paste0(ex_height2024 + 20, "' Height Allowed")))
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & !is.na(econ_affh) & (econ_affh > .9 )&
+                                !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                              parisian)) %>%
+      mutate(ZONING = replace(ZONING, 
+                              is.na(ZONING) & !is.na(econ_affh) & econ_affh > .9 & 
+                                !(is_fourplex_floor) & ex_height2024 > parisian_height,
+                              paste0(ex_height2024 + 20, "' Height Allowed")))
+  }
   }
   # Erase existing zoning indicators for rezoned parcels
   df[!is.na(df$ZONING), 
@@ -144,7 +195,7 @@ update_df <- function(scenario) {
     mutate(height = as.numeric(str_extract(ZONING, "\\d+"))) %>%
     mutate(height = height_setter(ZONING, height)) %>%
     mutate(
-      # Calculate envelope_1000_new based on ACRES and height
+      # See page 44 of Appendix B
       Envelope_1000_new = case_when(
         height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
         ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
@@ -253,6 +304,9 @@ ui <- fluidPage(
       HTML("<b>Overlay options:</b>"),
       checkboxInput("lldl", "Overlay large, low density lots (outside low opportunity tract)"),
       checkboxInput("affh", "Overlay high opportunity tracts per Draft 2024 TCAC Map"),
+      HTML("<b>Extend rezoning:</b>"),
+      checkboxInput("extend_affh", "Extend rezoning to high opportunity areas per Draft 2024 TCAC Map"),
+      checkboxInput("extend_econ", "Extend rezoning to areas with high economic opportunity"),
       position = "bottom-left"
     ),
     mainPanel(
@@ -272,8 +326,8 @@ server <- function(input, output) {
   updatedData <- reactiveVal(NA)
   
   # Update the reactive value whenever input features change
-  observeEvent(input$scenario, {
-    updatedData(update_df(input$scenario))
+  observeEvent(c(input$scenario, input$extend_affh, input$extend_econ), {
+    updatedData(update_df(input$scenario, input$extend_affh, input$extend_econ))
   })
   
   output$mainPlot <- renderLeaflet({

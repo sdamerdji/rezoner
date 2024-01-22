@@ -11,7 +11,7 @@ sf_use_s2(FALSE)
 
 
 
-df <- st_read_feather('./four_rezonings_v2.feather')
+df <- st_read_feather('../four_rezonings_v2.feather')
 
 
 # Get low opportunity areas in SF
@@ -31,7 +31,7 @@ results <- st_join(df, heights, largest=T)
 high_opp <- st_union(equity_sf[equity_sf$oppcat %in% c('High Resource', 'Highest Resource'),])
 saveRDS(st_union(high_opp), './high_opp.RDS')
 
-results[, 'high_opportunity'] <- st_intersects(results, high_opp, sparse=F)
+results[, 'high_opportunity'] <- as.vector(st_intersects(results, high_opp, sparse=F))
 
 # Add econ opp score
 econ_opp <- st_read('../final_2023_shapefile/final_2023_public.shp')
