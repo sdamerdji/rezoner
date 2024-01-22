@@ -26,7 +26,7 @@ heights <- select(heights, -height) %>%
   mutate(ex_height2024 = as.numeric(ex_height2024))
 
 
-results <- st_join(df, heights)
+results <- st_join(df, heights, largest=T)
 
 high_opp <- st_union(equity_sf[equity_sf$oppcat %in% c('High Resource', 'Highest Resource'),])
 saveRDS(st_union(high_opp), './high_opp.RDS')
@@ -35,6 +35,12 @@ results[, 'high_opportunity'] <- st_intersects(results, high_opp, sparse=F)
 
 # Add econ opp score
 econ_opp <- st_read('../final_2023_shapefile/final_2023_public.shp')
+econ_opp <- econ_opp %>% 
+  st_filter(st_union(df)) %>%
+  rename(econ_affh = ecn_dmn, affh2023=oppcat) %>%
+  select(econ_affh, affh2023)
+
+results <- st_join(results, econ_opp, largest=T)
 
 # Existing Use
 tax <- st_read('../Assessor Historical Secured Property Tax Rolls_20240121.geojson')
