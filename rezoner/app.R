@@ -12,9 +12,8 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
-df <- st_read_feather('./four_rezonings_v3.feather')
+df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
-browser()
 geometries <- st_read_feather('./simple_geometries.feather')
 
 
@@ -133,12 +132,13 @@ update_df <- function(scenario, extend_affh, extend_econ) {
       #browser()
       # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
       is_fourplex_floor <- fourplex %in% df$ZONING
+      boost <- 20
       df <- df %>%
         mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & is_fourplex_floor & ex_height2024 <= 40,
                                fourplex,
                                ZONING)) %>%
         mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity 
-                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < 1111),
+                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < 300 - boost),
                                paste0(ex_height2024 + 20, "' Height Allowed"),
                                ZONING))
       
@@ -149,7 +149,7 @@ update_df <- function(scenario, extend_affh, extend_econ) {
                                parisian,
                                ZONING)) %>%
         mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity &
-                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < 1111),
+                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < 300 - boost),
                                paste0(ex_height2024 + 20, "' Height Allowed"),
                                ZONING))
     }
@@ -161,7 +161,7 @@ update_df <- function(scenario, extend_affh, extend_econ) {
                                fourplex,
                                ZONING)) %>%
         mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (econ_affh > .9 )  
-                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < 1111),
+                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < 300 - boost),
                                paste0(ex_height2024 + 20, "' Height Allowed"),
                                ZONING))
       
@@ -172,7 +172,7 @@ update_df <- function(scenario, extend_affh, extend_econ) {
                                parisian,
                                ZONING)) %>%
         mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (econ_affh > .9) & 
-                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < 1111),
+                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < 300 - boost),
                                paste0(ex_height2024 + 20, "' Height Allowed"),
                                ZONING))
     }
