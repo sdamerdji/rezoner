@@ -12,7 +12,7 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 
 #pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 
-df <- st_read_feather('./four_rezonings_v2.feather')
+df <- st_read_feather('./four_rezonings_v3.feather')
 df['ZONING'] <- NA
 geometries <- st_read_feather('./simple_geometries.feather')
 
