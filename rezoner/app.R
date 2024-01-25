@@ -121,8 +121,7 @@ update_df <- function(scenario, extend, n_years) {
     df <- union_of_maxdens(df)
     df <- paris(df)
   }
-  df <- df[!is.na(df$ZONING),]
-    boost <- 20
+  boost <- 20
     if (extend == 'extend_affh') {
       # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
       is_fourplex_floor <- fourplex %in% df$ZONING
@@ -217,23 +216,19 @@ update_df <- function(scenario, extend, n_years) {
                             paste0(ex_height2024 + boost, "' Height Allowed"),
                             ZONING))
     }
+  df <- df[!is.na(df$ZONING),]
   
   # Erase existing zoning indicators for rezoned parcels
-  df[!is.na(df$ZONING), 
-     grep("^zp", names(df), value = TRUE)
-     ] <- 0
-  
-  # So I don't have to handle missing values
-  df[is.na(df$ZONING), 'ZONING'] <- 'No Change'
+  df[, grep("^zp", names(df), value = TRUE)] <- 0
   
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
-    mutate(zp_FormBasedMulti = if_else(!(ZONING == 'No Change' | ZONING == fourplex),
+    mutate(zp_FormBasedMulti = if_else(ZONING != fourplex,
                                        1,
                                        zp_FormBasedMulti))
   
   df <- df %>%
-    mutate(zp_DensRestMulti = if_else(ZONING == fourplex | ZONING == 'No Change', 1, zp_DensRestMulti)) %>%
+    mutate(zp_DensRestMulti = if_else(ZONING == fourplex, 1, zp_DensRestMulti)) %>%
     mutate(height = as.numeric(str_extract(ZONING, "\\d+"))) %>%
     mutate(height = height_setter(ZONING, height)) %>%
     mutate(
@@ -245,13 +240,9 @@ update_df <- function(scenario, extend, n_years) {
         TRUE ~ NA_real_
       ),
       # no downzoning allowed
-      Envelope_1000_new = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
       existing_sqft = Envelope_1000 / Upzone_Ratio,
-      Upzone_Ratio_new = Envelope_1000_new / existing_sqft
-    ) %>%
-    mutate(
-      Envelope_1000 = if_else(!(ZONING == 'No Change'), Envelope_1000_new, Envelope_1000),
-      Upzone_Ratio = if_else(!(ZONING == 'No Change'), Upzone_Ratio_new, Upzone_Ratio)
+      Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
+      Upzone_Ratio = Envelope_1000 / existing_sqft
     ) %>%
     mutate(expected_units_if_dev = ifelse(ZONING != 'No Change', 
                                           Envelope_1000 * 1000 * 0.8 / 850, 0))
