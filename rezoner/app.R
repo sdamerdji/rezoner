@@ -16,7 +16,9 @@ max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
 geometries <- st_read_feather('./simple_geometries.feather')
-
+info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
+                       "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
+                       "Lots with existing multi-family residential uses or multi-family zoning are excluded.")
 
 # Years after rezoning
 fourplex <- "Increased density up to four units (six units on corner lots)"
@@ -86,7 +88,7 @@ height_setter <- function(ZONING, height) {
 
 
 upzone <- function(df) {
-  (total_expected_units <- sum(df$expected_units, na.rm=T))
+  sum(df$expected_units, na.rm=T) - sum(df$expected_units_baseline, na.rm=T)
 }
 
 update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
@@ -278,22 +280,7 @@ ui <- fluidPage(
   id = "main_content",
   tags$head(
     tags$script(src = "./js-confetti.browser.js"),
-    tags$script(HTML("
-      var jsConfettiInstance; // Global confetti instance
-      document.addEventListener('DOMContentLoaded', function() {
-        jsConfettiInstance = new JSConfetti(); // Instantiate when the document is ready
-      });
-      
-      // Define the sprayConfetti function
-      function sprayConfetti() {
-        for (var i = 0; i < 2; i++) {
-            setTimeout(function() {
-                jsConfettiInstance.addConfetti();
-            }, 1000 * i); // Delay of 1 second (1000 milliseconds) between each spray
-        }
-      }
-    "))
-  ),
+    
   tags$head(
     tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
   ),
@@ -302,7 +289,7 @@ ui <- fluidPage(
   ),
   sidebarLayout(
     sidebarPanel(
-      radioButtons("scenario", "Upzoning Strategies:",
+      selectInput("scenario", "Upzoning Strategies:",
                          choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "D",
                                      "Housing Element Rezoning Scenario A" = "A",
                                      "Housing Element Rezoning Scenario B" = "B",
@@ -321,43 +308,43 @@ ui <- fluidPage(
         actionButton("reset_map", "Reset", icon = icon("sync"))
       ),
       HTML("<b>Overlay options:</b>"),
-      checkboxInput("lldl", "Overlay large, low density lots (outside low opportunity tract)"),
-      span(
-        id = "lldl_info",
-        class = "info-icon",
-        HTML('<span data-toggle="tooltip">&#9432;</span>')
+      checkboxInput(
+        "lldl",
+        label = list(
+          "Overlay large, low density lots (outside low opportunity tract)",
+          span(
+            id = "lldl_info",
+            class = "info-icon",
+            HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a href=\'http://www.wojt.eu\' target=\'blank\' >click me, Ill try not to disappear</a>">&#9432;</span>')
+          )
+        )
       ),
-      bsTooltip(id = "lldl_info", placement="right", #options=list(data.html=TRUE),
-                title = paste0("Large is defined as >= 2500 sq ft&#013;", 
-                               "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
-                               "Lots with existing multi-family residential uses or multi-family zoning are excluded.")),
       
+      checkboxInput(
+        "affh",
+        label = list(
+        "Overlay high opportunity tracts",
+        span(
+          id = "affh_info",
+          class = "info-icon",
+          HTML(
+            '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by Draft 2024 TCAC Map.</a>">&#9432;</span>'
+          )
+        )
+      )),
       
-      
-      checkboxInput("affh", "Overlay high opportunity tracts"),
-      span(
-        id = "affh_info",
-        class = "info-icon",
-        HTML('<span data-toggle="tooltip">&#9432;</span>')
-      ),
-      bsTooltip(id = "affh_info", placement="right", #options=list(data.html=TRUE),
-                title = paste0("High opportunity is defined by Draft 2024 TCAC Map.")),
-      
-      
-      checkboxInput("peg", "Overlay priority equity geographies"),
+      checkboxInput("peg", label=list("Overlay priority equity geographies",
       span(
         id = "peg_info",
         class = "info-icon",
-        HTML('<span data-toggle="tooltip">&#9432;</span>')
-      ),
-      bsTooltip(id = "peg_info", placement="right", #options=list(data.html=TRUE),
-                title = paste0("Now that this PEG SUD is not the final adopted",
-                               " SUD in the CRO, which added parts of North ",
-                               "Beach and removed parts of Inner Richmond.")),
+        HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> Now that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
+        )
+      ))),
       HTML("</br><b>Extend rezoning:</b> </br>"),
       checkboxInput("extend_affh", "Extend rezoning to high opportunity areas per Draft 2024 TCAC Map"),
       checkboxInput("extend_except_peg", "Extend rezoning to anywhere that's not a PEG"),
       checkboxInput("extend_econ", "Extend rezoning to areas with high economic opportunity"),
+      tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
       sliderInput("years_slider", 
                   "Project housing production over the next number of years:", 
                   min = 5, 
@@ -372,6 +359,47 @@ ui <- fluidPage(
       position = "top-right",
       height = "600px"
     )
+  ),
+  tags$script(HTML("
+      var jsConfettiInstance; // Global confetti instance
+      document.addEventListener('DOMContentLoaded', function() {
+        jsConfettiInstance = new JSConfetti(); // Instantiate when the document is ready
+      });
+      
+      // Define the sprayConfetti function
+      function sprayConfetti() {
+        for (var i = 0; i < 2; i++) {
+            setTimeout(function() {
+                jsConfettiInstance.addConfetti();
+            }, 1000 * i); // Delay of 1 second (1000 milliseconds) between each spray
+        }
+      }
+          var originalLeave = $.fn.popover.Constructor.prototype.leave;
+      $.fn.popover.Constructor.prototype.leave = function(obj){
+        var self = obj instanceof this.constructor ?
+          obj : $(obj.currentTarget)[this.type](this.getDelegateOptions()).data('bs.' + this.type)
+        var container, timeout;
+
+        originalLeave.call(this, obj);
+      
+        if(obj.currentTarget) {
+          container = $(obj.currentTarget).siblings('.popover')
+          timeout = self.timeout;
+          container.one('mouseenter', function(){
+            //We entered the actual popover – call off the dogs
+            clearTimeout(timeout);
+            //Let's monitor popover content instead
+            container.one('mouseleave', function(){
+              $.fn.popover.Constructor.prototype.leave.call(self, self);
+            });
+          })
+        }
+      };
+      
+      
+      $('body').popover({ selector: '[data-popover]', trigger: 'click hover', placement: 'auto', delay: {show: 50, hide: 400}});
+  
+    "))
   )
 )
 
@@ -449,7 +477,7 @@ server <- function(input, output) {
                 .groups='keep')
     to_plot <- st_sf(left_join(to_plot, geometries, 
                                by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
-    to_plot$n_stories <- as.numeric(str_extract(to_plot$ZONING, "\\d+")) %/% 10
+    to_plot$n_stories <- (as.numeric(str_extract(to_plot$ZONING, "\\d+")) - 5) %/% 10
     to_plot[to_plot$ZONING == fourplex, 'n_stories'] <- 4
     to_plot[to_plot$ZONING == decontrol, 'n_stories'] <- 4
     to_plot <- st_sf(to_plot)
@@ -497,7 +525,9 @@ server <- function(input, output) {
     updated_help <- paste(
       "Initial shortfall: 36,282 units. \nYou helped build: ",
       formatC(added_capacity, format="f", big.mark=",", digits=0),
-      "new units by 2031."
+      "new units in",
+      input$years_slider,
+      'years.'
     )
     congrats <- paste("\nYOU MET THE GOAL AND ADDED AN EXTRA", 
                       formatC(added_capacity - 36282, 
