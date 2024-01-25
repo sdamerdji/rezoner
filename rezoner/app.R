@@ -2,16 +2,15 @@ library(shiny)
 library(dplyr)
 library(sf)
 library(leaflet)
-#library(waiter)
 library(shinyjs)
 library(shinyBS)
 library(sfarrow)
 library(stringr)
 
+source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds')
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 
-#pal <- colorBin("viridis",  bins = c(0, 1, 5, 10, 100, Inf), right = F)
 max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
@@ -48,36 +47,28 @@ legalize_it <- function(df) {
   df
 }
 
-union_of_maxdens <- function(df) {
-  # Set M3 Zoning to be maximum upzoning of M1 and M2. Surely this is covered by EIR
-  df %>% 
-    mutate(ZONING =
-             case_when(
-               as.numeric(str_extract(M1_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M1_ZONING,
-               !is.na(as.numeric(str_extract(M1_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(M3_ZONING,  "\\d+"))) ~ M1_ZONING,
-               TRUE ~ M1_ZONING
-             )) %>%
-    mutate(ZONING = 
-             case_when(
-               as.numeric(str_extract(M2_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M2_ZONING,
-               !is.na(as.numeric(str_extract(M2_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M2_ZONING,
-               TRUE ~ ZONING
-             )) %>%
-    mutate(ZONING = 
-             case_when(
-               as.numeric(str_extract(M3_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M3_ZONING,
-               !is.na(as.numeric(str_extract(M3_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M3_ZONING,
-               TRUE ~ ZONING
-             )
-    ) %>%
-     mutate(ZONING = 
-              case_when(
-                as.numeric(str_extract(M4_ZONING, "\\d+")) > as.numeric(str_extract(ZONING,  "\\d+")) ~ M4_ZONING,
-                !is.na(as.numeric(str_extract(M4_ZONING, "\\d+"))) & is.na(as.numeric(str_extract(ZONING,  "\\d+"))) ~ M4_ZONING,
-                TRUE ~ ZONING
-                )
-    )
+get_denser_zone <- function(current_zoning, new_zoning) {
+  # Set current zoning to new zoning if new zoning is bigger, on a per-parcel level
+  new_zoning_numeric <- as.numeric(str_extract(new_zoning, "\\d+"))
+  current_zoning_numeric <- as.numeric(str_extract(current_zoning, "\\d+"))
+  
+  case_when(
+    new_zoning_numeric > current_zoning_numeric ~ new_zoning,
+    !is.na(new_zoning_numeric) & is.na(current_zoning_numeric) ~ new_zoning,
+    !is.na(current_zoning) & is.na(new_zoning) ~ current_zoning,
+    is.na(current_zoning) & !is.na(new_zoning) ~ new_zoning,
+    TRUE ~ current_zoning
+  )
 }
+
+union_of_maxdens <- function(df) {
+  df %>% 
+    mutate(ZONING = get_denser_zone(ZONING, M1_ZONING)) %>%
+    mutate(ZONING = get_denser_zone(ZONING, M2_ZONING)) %>%
+    mutate(ZONING = get_denser_zone(ZONING, M3_ZONING)) %>%
+    mutate(ZONING = get_denser_zone(ZONING, M4_ZONING))
+}
+
 
 height_setter <- function(ZONING, height) {
   dplyr::case_when(
@@ -244,8 +235,7 @@ update_df <- function(scenario, extend, n_years) {
       Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
       Upzone_Ratio = Envelope_1000 / existing_sqft
     ) %>%
-    mutate(expected_units_if_dev = ifelse(ZONING != 'No Change', 
-                                          Envelope_1000 * 1000 * 0.8 / 850, 0))
+    mutate(expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850)
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
@@ -288,140 +278,6 @@ calculate_shortfall <- function(df) {
   df2 <- select(df, -geometry)
   return(upzone(df2))
 }
-
-# UI definition
-ui <- fluidPage(
-  useShinyjs(),  # Initialize shinyjs
-  id = "main_content",
-  tags$head(
-    tags$script(src = "./js-confetti.browser.js"),
-    
-  tags$head(
-    tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
-  ),
-  titlePanel(
-    "Upzone the City"
-  ),
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("scenario", "Upzoning Strategies:",
-                         choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "D",
-                                     "Housing Element Rezoning Scenario A" = "A",
-                                     "Housing Element Rezoning Scenario B" = "B",
-                                     "Housing Element Rezoning Scenario C" = "C",
-                                     "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
-                                     "Parisian zoning in low density neighborhoods" = "Parisian"),
-                         selected = 'D'),
-      # radioButtons("customize_map", "Customize this rezoning:",
-      #              choices = c("No" = "no", "Yes" = "yes"),
-      #              selected = "no"),
-      # conditionalPanel(
-      #   condition = "input.customize_map == 'yes'",
-      #   radioButtons("stories", "Select number of stories:",
-      #                choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
-      #                selected = NULL),
-      #   actionButton("reset_map", "Reset", icon = icon("sync"))
-      # ),
-      HTML("<b>Overlay options:</b>"),
-      checkboxInput(
-        "lldl",
-        label = list(
-          "Overlay large, low density lots (outside low opportunity tract)",
-          span(
-            id = "lldl_info",
-            class = "info-icon",
-            HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a href=\'http://www.sfyimby.org\' target=\'blank\' >click me, Ill try not to disappear</a>">&#9432;</span>')
-          )
-        )
-      ),
-      
-      checkboxInput(
-        "affh",
-        label = list(
-        "Overlay high opportunity tracts",
-        span(
-          id = "affh_info",
-          class = "info-icon",
-          HTML(
-            '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by Draft 2024 TCAC Map.</a>">&#9432;</span>'
-          )
-        )
-      )),
-      
-      checkboxInput("peg", label=list("Overlay priority equity geographies",
-      span(
-        id = "peg_info",
-        class = "info-icon",
-        HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> Now that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
-        )
-      ))),
-      selectInput('extend', 'Extend rezoning:', choices = 
-                    c("Extend rezoning to high opportunity areas" = "extend_affh",
-                      "Extend rezoning to anywhere that's not a PEG" = "extend_except_peg",
-                      "Extend rezoning to rest of city" = "extend_errwhere",
-                      "Extend rezoning to areas with high economic opportunity" = "extend_econ",
-                      'Select an option.' = 'none'),
-                  selected = 'none'),
-      tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
-      sliderInput("years_slider", 
-                  "Project housing production over the next number of years:", 
-                  min = 5, 
-                  max = 10, 
-                  value = 5,
-                  step = 1),
-      position = "bottom-left"
-    ),
-    mainPanel(
-      leafletOutput("mainPlot", height = "600px"),
-      span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
-      span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
-      position = "top-right",
-      height = "600px"
-    )
-  ),
-  tags$script(HTML("
-      var jsConfettiInstance; // Global confetti instance
-      document.addEventListener('DOMContentLoaded', function() {
-        jsConfettiInstance = new JSConfetti(); // Instantiate when the document is ready
-      });
-      
-      // Define the sprayConfetti function
-      function sprayConfetti() {
-        for (var i = 0; i < 2; i++) {
-            setTimeout(function() {
-                jsConfettiInstance.addConfetti();
-            }, 1000 * i); // Delay of 1 second (1000 milliseconds) between each spray
-        }
-      }
-          var originalLeave = $.fn.popover.Constructor.prototype.leave;
-      $.fn.popover.Constructor.prototype.leave = function(obj){
-        var self = obj instanceof this.constructor ?
-          obj : $(obj.currentTarget)[this.type](this.getDelegateOptions()).data('bs.' + this.type)
-        var container, timeout;
-
-        originalLeave.call(this, obj);
-      
-        if(obj.currentTarget) {
-          container = $(obj.currentTarget).siblings('.popover')
-          timeout = self.timeout;
-          container.one('mouseenter', function(){
-            //We entered the actual popover – call off the dogs
-            clearTimeout(timeout);
-            //Let's monitor popover content instead
-            container.one('mouseleave', function(){
-              $.fn.popover.Constructor.prototype.leave.call(self, self);
-            });
-          })
-        }
-      };
-      
-      
-      $('body').popover({ selector: '[data-popover]', trigger: 'click hover', placement: 'auto', delay: {show: 50, hide: 400}});
-  
-    "))
-  )
-)
-
 
 
 
