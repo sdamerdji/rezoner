@@ -88,11 +88,10 @@ height_setter <- function(ZONING, height) {
 
 
 upzone <- function(df) {
-  sum(df$expected_units, na.rm=T) - sum(df$expected_units_baseline, na.rm=T)
+  sum(pmax(df$expected_units - df$expected_units_baseline, 0, na.rm = T))
 }
 
-update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
-                      n_years) {
+update_df <- function(scenario, extend, n_years) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
@@ -122,12 +121,9 @@ update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
     df <- union_of_maxdens(df)
     df <- paris(df)
   }
-  if (scenario == 'Legalize It') {
-    df <- legalize_it(df)
-  }
-  else {
+  df <- df[!is.na(df$ZONING),]
     boost <- 20
-    if (extend_affh == TRUE) {
+    if (extend == 'extend_affh') {
       # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
       is_fourplex_floor <- fourplex %in% df$ZONING
       df <- df %>%
@@ -151,7 +147,7 @@ update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
                                paste0(ex_height2024 + boost, "' Height Allowed"),
                                ZONING))
     }
-    if (extend_econ == TRUE) {
+    if (extend == 'extend_econ') {
       #TODO: I feel like !is.na(econ_affh) should not work
       is_fourplex_floor <- fourplex %in% df$ZONING
       df <- df %>%
@@ -175,30 +171,53 @@ update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
                                paste0(ex_height2024 + boost, "' Height Allowed"),
                                ZONING))
     }
-    if (extend_but_for_peg == TRUE) {
+    if (extend ==  'extend_except_peg') {
       is_fourplex_floor <- fourplex %in% df$ZONING
       df <- df %>%
         mutate(ZONING = ifelse(is.na(ZONING)  & (!is.na(peg)) & (!peg)
                                & is_fourplex_floor & (ex_height2024 <= 40),
                                fourplex,
-                               ZONING)) #%>%
-       # mutate(ZONING = ifelse(is.na(ZONING) & (!peg)  
-       #                        & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-       #                        paste0(ex_height2024 + boost, "' Height Allowed"),
-       #                        ZONING))
+                               ZONING)) %>%
+       mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
+                              & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
+                              paste0(ex_height2024 + boost, "' Height Allowed"),
+                              ZONING))
       
       # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
       df <- df %>%
         mutate(ZONING = ifelse(is.na(ZONING) & (!is.na(peg)) & (!peg) & 
                                  !(is_fourplex_floor) & ex_height2024 <= parisian_height,
                                parisian,
-                               ZONING)) #%>%
-        #mutate(ZONING = ifelse(is.na(ZONING) & (!peg) & 
-        #                         !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-        #                       paste0(ex_height2024 + boost, "' Height Allowed"),
-        #                       ZONING))
+                               ZONING)) %>%
+        mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
+                                !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                              paste0(ex_height2024 + boost, "' Height Allowed"),
+                              ZONING))
     }
-  }
+    if (extend == 'extend_errwhere') {
+      is_fourplex_floor <- fourplex %in% df$ZONING
+      df <- df %>%
+        mutate(ZONING = ifelse(is.na(ZONING)  
+                               & is_fourplex_floor & (ex_height2024 <= 40),
+                               fourplex,
+                               ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
+                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+
+      # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+      df <- df %>%
+        mutate(ZONING = ifelse(is.na(ZONING) &
+                                 !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                               parisian,
+                               ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
+                              !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                            paste0(ex_height2024 + boost, "' Height Allowed"),
+                            ZONING))
+    }
+  
   # Erase existing zoning indicators for rezoned parcels
   df[!is.na(df$ZONING), 
      grep("^zp", names(df), value = TRUE)
@@ -247,9 +266,14 @@ update_df <- function(scenario, extend_affh, extend_econ, extend_but_for_peg,
   }
   
   predictions.16 <- predict(model, newdata = df, type = "response")
+  
   df <- df %>%
     mutate(pdev = 1 - (1-predictions.16)^n_years) %>% 
-    mutate(expected_units = pdev * expected_units_if_dev)
+    mutate(pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years) %>%
+    mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
+    mutate(expected_units = pdev * expected_units_if_dev) %>%
+    mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
+    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev)
   
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
@@ -264,7 +288,7 @@ generate_plot <- function() {
       "bottomright",
       title = "Base Zoning",
       colors = pal(c(1, 5, 8, 10, 20)),
-      labels = c("<4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
+      labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
       opacity = 0.5
     )
 }
@@ -297,16 +321,16 @@ ui <- fluidPage(
                                      "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
                                      "Parisian zoning in low density neighborhoods" = "Parisian"),
                          selected = 'D'),
-      radioButtons("customize_map", "Customize this rezoning:",
-                   choices = c("No" = "no", "Yes" = "yes"),
-                   selected = "no"),
-      conditionalPanel(
-        condition = "input.customize_map == 'yes'",
-        radioButtons("stories", "Select number of stories:",
-                     choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
-                     selected = NULL),
-        actionButton("reset_map", "Reset", icon = icon("sync"))
-      ),
+      # radioButtons("customize_map", "Customize this rezoning:",
+      #              choices = c("No" = "no", "Yes" = "yes"),
+      #              selected = "no"),
+      # conditionalPanel(
+      #   condition = "input.customize_map == 'yes'",
+      #   radioButtons("stories", "Select number of stories:",
+      #                choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
+      #                selected = NULL),
+      #   actionButton("reset_map", "Reset", icon = icon("sync"))
+      # ),
       HTML("<b>Overlay options:</b>"),
       checkboxInput(
         "lldl",
@@ -315,7 +339,7 @@ ui <- fluidPage(
           span(
             id = "lldl_info",
             class = "info-icon",
-            HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a href=\'http://www.wojt.eu\' target=\'blank\' >click me, Ill try not to disappear</a>">&#9432;</span>')
+            HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a href=\'http://www.sfyimby.org\' target=\'blank\' >click me, Ill try not to disappear</a>">&#9432;</span>')
           )
         )
       ),
@@ -340,10 +364,13 @@ ui <- fluidPage(
         HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> Now that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
         )
       ))),
-      HTML("</br><b>Extend rezoning:</b> </br>"),
-      checkboxInput("extend_affh", "Extend rezoning to high opportunity areas per Draft 2024 TCAC Map"),
-      checkboxInput("extend_except_peg", "Extend rezoning to anywhere that's not a PEG"),
-      checkboxInput("extend_econ", "Extend rezoning to areas with high economic opportunity"),
+      selectInput('extend', 'Extend rezoning:', choices = 
+                    c("Extend rezoning to high opportunity areas" = "extend_affh",
+                      "Extend rezoning to anywhere that's not a PEG" = "extend_except_peg",
+                      "Extend rezoning to rest of city" = "extend_errwhere",
+                      "Extend rezoning to areas with high economic opportunity" = "extend_econ",
+                      'Select an option.' = 'none'),
+                  selected = 'none'),
       tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
       sliderInput("years_slider", 
                   "Project housing production over the next number of years:", 
@@ -356,6 +383,7 @@ ui <- fluidPage(
     mainPanel(
       leafletOutput("mainPlot", height = "600px"),
       span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
+      span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
       position = "top-right",
       height = "600px"
     )
@@ -411,8 +439,8 @@ server <- function(input, output) {
   updatedData <- reactiveVal(NA)
   
   # Update the reactive value whenever input features change
-  observeEvent(c(input$scenario, input$extend_affh, input$extend_econ, input$extend_except_peg, input$years_slider), {
-    updatedData(update_df(input$scenario, input$extend_affh, input$extend_econ, input$extend_except_peg, input$years_slider))
+  observeEvent(c(input$scenario, input$extend, input$years_slider), {
+    updatedData(update_df(input$scenario, input$extend, input$years_slider))
   })
   
   output$mainPlot <- renderLeaflet({
@@ -518,6 +546,14 @@ server <- function(input, output) {
     
   })
   
+  output$supervisors <- renderText({
+    values <- st_drop_geometry(updatedData()) %>% 
+      mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
+      group_by(sup_name) %>%
+      summarise(units = sum(net_units, na.rm=T)) %>%
+      arrange(desc(units))
+    return(paste0(format(values$sup_name, width=15), "\t", round(values$units), ' units\n'))
+  })
   
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
@@ -549,15 +585,15 @@ server <- function(input, output) {
     return(result)
   })
   
-  observe({
-    if(input$customize_map == "yes") {
-      # Change cursor to paint roller
-      shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
-    } else {
-      # Revert cursor to default
-      shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
-    }
-  })
+  # observe({
+  #   if(input$customize_map == "yes") {
+  #     # Change cursor to paint roller
+  #     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
+  #   } else {
+  #     # Revert cursor to default
+  #     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
+  #   }
+  # })
   
 }
 

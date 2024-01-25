@@ -60,8 +60,58 @@ df2 <- results_no_mfr %>%
   filter(is.na(ex_height2024) | (ex_height2024 < height_max))
 
 
-plot(df2[,'ex_height2024'])
-saveRDS(st_union(df2), './growth.RDS')
-plot(low_opp)
+# Remove ports, open space, and schools from df
 
-st_write_feather(results, './four_rezonings_v3.feather')
+
+#plot(df2[,'ex_height2024'])
+saveRDS(st_union(df2), './growth.RDS')
+#plot(low_opp)
+
+
+# Priority equity geographies
+sud <- st_read('../Zoning Map - Special Use Districts_20240122.geojson')
+peg <- sud[sud$name == 'Priority Equity Geographies Special Use District',]$geometry
+saveRDS(peg, './peg.RDS')
+results[, 'peg'] <- as.vector(st_intersects(results, peg, sparse=F))
+
+# Add a column for E[U | Baseline] and E[U | Skyscraper]
+model <- readRDS(file='./light_model.rds')
+predictions.16 <- predict(model, newdata = results, type = "response")
+# E[U | Baseline]
+results <- results %>%
+  mutate(pdev_baseline_1yr = predictions.16) %>% 
+  mutate(expected_units_baseline_if_dev = Envelope_1000 * 1000 * 0.8 / 850)
+
+# E[U | Skyscraper]
+skyscrapers <-  "300' Height Allowed"
+
+df <- results %>%
+  mutate(zp_FormBasedMulti = 1) %>%
+  mutate(height = 300) %>%
+  mutate(
+    # See page 44 of Appendix B
+    Envelope_1000_new = case_when(
+      height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
+      ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
+      ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
+      TRUE ~ NA_real_
+    ),
+    # no downzoning allowed
+    Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
+    existing_sqft = Envelope_1000 / Upzone_Ratio,
+    Upzone_Ratio = Envelope_1000 / existing_sqft
+  ) %>%
+  mutate(expected_units_skyscraper_if_dev = Envelope_1000 * 1000 * 0.8 / 850)
+predictions.16_skyscraper <- predict(model, newdata = df, type = "response")
+results[,'expected_units_skyscraper_if_dev'] <- df$expected_units_skyscraper_if_dev
+results[,'pdev_skyscraper_1yr'] <- predictions.16_skyscraper
+
+#results <- st_read_feather('./four_rezonings_v3.feather')
+supervisors <- st_read('./Supervisor Districts (2022)_20240124.geojson')
+
+nrow(results)
+results2 <- st_join(results, supervisors, largest=T)
+nrow(results2)
+results2 <- select(results2, -c("sup_dist_pad", "sup_dist_num", 
+              "data_loaded_at", "sup_dist", "data_as_of"))
+st_write_feather(results2, '../four_rezonings_v3.feather')
