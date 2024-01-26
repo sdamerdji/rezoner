@@ -269,7 +269,7 @@ update_df <- function(scenario, extend, n_years) {
     mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
     mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev)
   
-  df <- rbind(df, squo_zoning)
+  #df <- rbind(df, squo_zoning)
   
   return(df)
 }
