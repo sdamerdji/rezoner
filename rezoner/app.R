@@ -6,6 +6,7 @@ library(shinyjs)
 library(shinyBS)
 library(sfarrow)
 library(stringr)
+library(RColorBrewer)
 
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds')
@@ -113,100 +114,101 @@ update_df <- function(scenario, extend, n_years) {
     df <- paris(df)
   }
   boost <- 20
-    if (extend == 'extend_affh') {
-      # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
-      is_fourplex_floor <- fourplex %in% df$ZONING
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) 
-                               & is_fourplex_floor & (ex_height2024 <= 40),
-                               fourplex,
-                               ZONING)) %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg)
-                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                               paste0(ex_height2024 + boost, "' Height Allowed"),
-                               ZONING))
-      
-      # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
-                                 !(is_fourplex_floor) & (ex_height2024 <= parisian_height),
-                               parisian,
-                               ZONING)) %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
-                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                               paste0(ex_height2024 + boost, "' Height Allowed"),
-                               ZONING))
-    }
-    if (extend == 'extend_econ') {
-      #TODO: I feel like !is.na(econ_affh) should not work
-      is_fourplex_floor <- fourplex %in% df$ZONING
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 ) 
-                               & is_fourplex_floor & (ex_height2024 <= 40),
-                               fourplex,
-                               ZONING)) %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 )  
-                               & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                               paste0(ex_height2024 + boost, "' Height Allowed"),
-                               ZONING))
-      
-      # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) &
-                                 !(is_fourplex_floor) & ex_height2024 <= parisian_height,
-                               parisian,
-                               ZONING)) %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) & 
-                                 !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                               paste0(ex_height2024 + boost, "' Height Allowed"),
-                               ZONING))
-    }
-    if (extend ==  'extend_except_peg') {
-      is_fourplex_floor <- fourplex %in% df$ZONING
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING)  & (!is.na(peg)) & (!peg)
-                               & is_fourplex_floor & (ex_height2024 <= 40),
-                               fourplex,
-                               ZONING)) %>%
-       mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
-                              & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                              paste0(ex_height2024 + boost, "' Height Allowed"),
-                              ZONING))
-      
-      # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & (!is.na(peg)) & (!peg) & 
-                                 !(is_fourplex_floor) & ex_height2024 <= parisian_height,
-                               parisian,
-                               ZONING)) %>%
-        mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
-                                !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                              paste0(ex_height2024 + boost, "' Height Allowed"),
-                              ZONING))
-    }
-    if (extend == 'extend_errwhere') {
-      is_fourplex_floor <- fourplex %in% df$ZONING
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING)  
-                               & is_fourplex_floor & (ex_height2024 <= 40),
-                               fourplex,
-                               ZONING)) %>%
+  if (extend == 'extend_affh') {
+    # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) 
+                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             fourplex,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg)
+                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
+                               !(is_fourplex_floor) & (ex_height2024 <= parisian_height),
+                             parisian,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
+                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+  }
+  if (extend == 'extend_econ') {
+    #TODO: I feel like !is.na(econ_affh) should not work
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 ) 
+                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             fourplex,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 )  
+                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) &
+                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                             parisian,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) & 
+                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+  }
+  if (extend ==  'extend_except_peg') {
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING)  & (!is.na(peg)) & (!peg)
+                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             fourplex,
+                             ZONING)) %>%
       mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
                              & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
                              paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
-
-      # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-      df <- df %>%
-        mutate(ZONING = ifelse(is.na(ZONING) &
-                                 !(is_fourplex_floor) & ex_height2024 <= parisian_height,
-                               parisian,
-                               ZONING)) %>%
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & (!is.na(peg)) & (!peg) & 
+                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                             parisian,
+                             ZONING)) %>%
       mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
-                              !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                            paste0(ex_height2024 + boost, "' Height Allowed"),
-                            ZONING))
-    }
+                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+  }
+  if (extend == 'extend_errwhere') {
+    is_fourplex_floor <- fourplex %in% df$ZONING
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING)  
+                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             fourplex,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
+                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+    
+    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) &
+                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                             parisian,
+                             ZONING)) %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
+                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
+                             paste0(ex_height2024 + boost, "' Height Allowed"),
+                             ZONING))
+  }
+  squo_zoning <- df[is.na(df$ZONING),]
   df <- df[!is.na(df$ZONING),]
   
   # Erase existing zoning indicators for rezoned parcels
@@ -254,9 +256,21 @@ update_df <- function(scenario, extend, n_years) {
     mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
     mutate(expected_units = pdev * expected_units_if_dev) %>%
     mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
-    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev)
+    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev) %>%
+    select(-Envelope_1000_new, -existing_sqft)
   
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
+  squo_zoning <- squo_zoning %>%
+    mutate(pdev = 1 - (1-pdev_baseline_1yr)^n_years) %>% 
+    mutate(pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years) %>%
+    mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
+    mutate(expected_units = pdev * expected_units_baseline_if_dev) %>%
+    mutate(expected_units_if_dev = expected_units_baseline_if_dev) %>%
+    mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
+    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev)
+  
+  df <- rbind(df, squo_zoning)
+  
   return(df)
 }
 
@@ -264,14 +278,7 @@ generate_plot <- function() {
   leaflet(df) %>%
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
-    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  %>%
-    addLegend(
-      "bottomright",
-      title = "Base Zoning",
-      colors = pal(c(1, 5, 8, 10, 20)),
-      labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
-      opacity = 0.5
-    )
+    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  
 }
 
 calculate_shortfall <- function(df) {
@@ -279,7 +286,20 @@ calculate_shortfall <- function(df) {
   return(upzone(df2))
 }
 
-
+simulate_buildout <- function(to_plot) {
+  sf_use_s2(T)
+  to_plot <- to_plot[runif(nrow(to_plot)) < to_plot$pdev, ]
+  to_plot[,'expected_units_if_dev'] <- to_plot$expected_units_if_dev / max(to_plot$expected_units_if_dev) * 1000
+  centroids <- st_centroid(to_plot)
+  
+  leafletProxy("mainPlot", data = centroids) %>%
+    clearGroup('parcels') %>%
+    clearGroup('dynamicMarkers') %>%
+    addCircles(lng = st_coordinates(centroids)[,1],
+               lat = st_coordinates(centroids)[,2],
+               radius = ~expected_units_if_dev,
+               group = 'dynamicMarkers')
+}
 
 # Server logic
 server <- function(input, output) {
@@ -334,63 +354,149 @@ server <- function(input, output) {
         clearGroup("affh")
     }
   })
+  observeEvent(c(input$resimulateBtn, input$map, input$scenario), {
+    if (input$map == 'sim') {
+      df <- updatedData()
+      df['block'] <- str_sub(df$mapblklot, 1, 4)
+      df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
+      df[df$ZONING == fourplex, 'n_stories'] <- 4
+      df[df$ZONING == decontrol, 'n_stories'] <- 4
+      to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
+      simulate_buildout(to_plot)
+    }
+  })
   
-  observe({
+  observeEvent(input$map, {
+    print('updating map')
+    print(input$map)
     df <- updatedData()  # Get the updated data
 
-    to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
     
     # Group by
-    start <- Sys.time()
-    to_plot['block'] <- str_sub(to_plot$mapblklot, 1, 4)
-    to_plot <- st_drop_geometry(to_plot)
-    to_plot <- to_plot %>%
-      group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
-      summarise(expected_units = sum(expected_units),
-                pdev = mean(pdev),
-                expected_units_if_dev = sum(expected_units_if_dev),
-                .groups='keep')
-    to_plot <- st_sf(left_join(to_plot, geometries, 
-                               by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
-    to_plot$n_stories <- (as.numeric(str_extract(to_plot$ZONING, "\\d+")) - 5) %/% 10
-    to_plot[to_plot$ZONING == fourplex, 'n_stories'] <- 4
-    to_plot[to_plot$ZONING == decontrol, 'n_stories'] <- 4
-    to_plot <- st_sf(to_plot)
-    to_plot <- st_cast(to_plot, "MULTIPOLYGON")
-    print(paste0('Group by took: ', round(Sys.time() - start, 1)))
+    df['block'] <- str_sub(df$mapblklot, 1, 4)
+    df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
+    df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
+    df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
+
     
     # Render
     start <- Sys.time()
-    leafletProxy("mainPlot", 
-                 data = to_plot) %>%
-      clearGroup('parcels') %>%
-      addPolygons(
-        fillColor = ~ pal(n_stories),
-        color = ~ pal(n_stories),
-        fillOpacity = 1,
-        weight = 1,
-        group = 'parcels',
-        popup = ~ paste(
-          "New Zoning:",
-          ZONING,
-          '<br>Block:', block,
-          "<br>Expected Units:",
-          formatC(round(expected_units, 1), format='f', big.mark=',', digits=1),
-          '<br>P(Dev):',
-          formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
-          '%',
-          '<br>E(Units | Dev):',
-          formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
-        ),
-        labelOptions = labelOptions(
-          style = list("font-weight" = "normal", padding = "3px 8px"),
-          textsize = "13px",
-          direction = "auto"
-        )
-      )
-    print(paste0('Rendering took: ', round(Sys.time() - start, 1)))
-    #waiter_hide() # hide the waiter
     
+    if (input$map == 'heights') {
+      to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
+      to_plot <- st_drop_geometry(to_plot)
+      to_plot <- to_plot %>%
+        group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
+        summarise(expected_units = sum(expected_units),
+                  pdev = mean(pdev),
+                  expected_units_if_dev = sum(expected_units_if_dev),
+                  n_stories = first(n_stories),
+                  .groups='keep')
+      to_plot <- st_sf(left_join(to_plot, geometries, 
+                                 by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
+      to_plot <- st_sf(to_plot)
+      to_plot <- st_cast(to_plot, "MULTIPOLYGON")
+      print(paste0('Group by took: ', round(Sys.time() - start, 1)))
+      leafletProxy("mainPlot", 
+                   data = to_plot) %>%
+        clearGroup('parcels') %>%
+        clearGroup('dynamicMarkers') %>%
+        clearControls() %>%
+        addPolygons(
+          fillColor = ~ pal(n_stories),
+          color = ~ pal(n_stories),
+          fillOpacity = 1,
+          weight = 1,
+          group = 'parcels',
+          popup = ~ paste(
+            "New Zoning:",
+            ZONING,
+            '<br>Block:', block,
+            "<br>Expected Units:",
+            formatC(round(expected_units, 1), format='f', big.mark=',', digits=1),
+            '<br>P(Dev):',
+            formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
+            '%',
+            '<br>E(Units | Dev):',
+            formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
+          ),
+          labelOptions = labelOptions(
+            style = list("font-weight" = "normal", padding = "3px 8px"),
+            textsize = "13px",
+            direction = "auto"
+          )) %>%
+            addLegend(
+              "bottomright",
+              title = "Base Zoning",
+              colors = pal(c(1, 5, 8, 10, 20)),
+              labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
+              opacity = 0.5
+            )
+        
+    } 
+    else if (input$map == "potential") {
+      print('wya')
+      sf_use_s2(T)
+      to_plot <- df
+      to_plot$missing_potential <- to_plot$expected_units_skyscraper - to_plot$expected_units
+      to_plot$missing_potential <- pmax(to_plot$missing_potential, 0, na.rm=T) / to_plot$ACRES
+      to_plot$missing_potential <- log(1 + to_plot$missing_potential)
+      centroids <- st_centroid(to_plot)
+      pal_pot <- colorNumeric(
+        palette = "Blues",
+        domain = to_plot$missing_potential)
+      
+      #browser()
+      leafletProxy("mainPlot", data = centroids) %>%
+        clearGroup('parcels') %>%
+        clearGroup('dynamicMarkers') %>%
+        clearControls() %>%
+        addCircles(lng = st_coordinates(centroids)[,1],
+                         lat = st_coordinates(centroids)[,2],
+                         radius = 1,
+                         color = ~pal_pot(missing_potential),
+                         group = 'dynamicMarkers',
+                         fillOpacity = .1, 
+                         weight = .1) %>%
+        addLegend(
+          "bottomright",
+          title = "Potential",
+          colors = pal_pot(quantile(centroids$missing_potential, na.rm=T)),
+          labels = as.character(seq(0, 1, 0.25))
+        )
+      print('done')
+    } 
+    else if (input$map == 'E[u]') {
+      to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
+      
+      print('eu')
+      sf_use_s2(T)
+      centroids <- st_centroid(to_plot)
+      centroids$expected_units <- log(centroids$expected_units)
+      pal_eu <- colorNumeric(
+        palette = "Blues",
+        domain = centroids$expected_units)
+      leafletProxy("mainPlot", data = centroids) %>%
+        clearGroup('parcels') %>%
+        clearGroup('dynamicMarkers') %>%
+        clearControls() %>%
+        addCircles(lng = st_coordinates(centroids)[,1],
+                         lat = st_coordinates(centroids)[,2],
+                         color = ~pal_eu(expected_units),
+                   radius = 10,
+                         group = 'dynamicMarkers',
+                         fillOpacity = .1, 
+                         weight = .1) %>%
+        addLegend(
+          "bottomright",
+          title = "E[Units]",
+          colors = pal_eu(quantile(centroids$expected_units, na.rm=T)),
+          labels = as.character(seq(0, 1, 0.25))
+        )
+    } else if (input$map == 'sim') {
+      to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
+      simulate_buildout(to_plot)
+    }
   })
   
   output$supervisors <- renderText({

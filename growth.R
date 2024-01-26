@@ -114,4 +114,5 @@ results2 <- st_join(results, supervisors, largest=T)
 nrow(results2)
 results2 <- select(results2, -c("sup_dist_pad", "sup_dist_num", 
               "data_loaded_at", "sup_dist", "data_as_of"))
+st_read()
 st_write_feather(results2, '../four_rezonings_v3.feather')
