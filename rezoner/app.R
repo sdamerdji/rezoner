@@ -7,6 +7,7 @@ library(shinyBS)
 library(sfarrow)
 library(stringr)
 library(RColorBrewer)
+library(compiler)
 
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds')
@@ -83,7 +84,7 @@ upzone <- function(df) {
   sum(pmax(df$expected_units - df$expected_units_baseline, 0, na.rm = T))
 }
 
-update_df <- function(scenario, extend, n_years) {
+update_df_ <- function(scenario, extend, n_years) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
@@ -208,20 +209,20 @@ update_df <- function(scenario, extend, n_years) {
                              paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
   }
-  squo_zoning <- df[is.na(df$ZONING),]
-  df <- df[!is.na(df$ZONING),]
+  #squo_zoning <- df[is.na(df$ZONING),]
+  #df <- df[!is.na(df$ZONING),]
   
   # Erase existing zoning indicators for rezoned parcels
   df[, grep("^zp", names(df), value = TRUE)] <- 0
   
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
-    mutate(zp_FormBasedMulti = if_else(ZONING != fourplex,
+    mutate(zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING),
                                        1,
                                        zp_FormBasedMulti))
   
   df <- df %>%
-    mutate(zp_DensRestMulti = if_else(ZONING == fourplex, 1, zp_DensRestMulti)) %>%
+    mutate(zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, zp_DensRestMulti)) %>%
     mutate(height = as.numeric(str_extract(ZONING, "\\d+"))) %>%
     mutate(height = height_setter(ZONING, height)) %>%
     mutate(
@@ -260,8 +261,8 @@ update_df <- function(scenario, extend, n_years) {
     select(-Envelope_1000_new, -existing_sqft)
   
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
-  squo_zoning <- squo_zoning %>%
-    mutate(pdev = 1 - (1-pdev_baseline_1yr)^n_years) %>% 
+  df[is.na(df$ZONING),] <- df[is.na(df$ZONING),]  %>%
+    mutate(pdev = 1 - (1-pdev_baseline_1yr)^n_years) %>%
     mutate(pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years) %>%
     mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
     mutate(expected_units = pdev * expected_units_baseline_if_dev) %>%
@@ -273,6 +274,8 @@ update_df <- function(scenario, extend, n_years) {
   
   return(df)
 }
+
+update_df <- cmpfun(update_df_)
 
 generate_plot <- function() {
   leaflet(df) %>%
@@ -359,14 +362,17 @@ server <- function(input, output) {
       df <- updatedData()
       df['block'] <- str_sub(df$mapblklot, 1, 4)
       df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
-      df[df$ZONING == fourplex, 'n_stories'] <- 4
-      df[df$ZONING == decontrol, 'n_stories'] <- 4
-      to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
+      df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
+      df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
+      to_plot <- filter(df, !is.na(df$ZONING) & !is.na(expected_units) & expected_units > 0)
       simulate_buildout(to_plot)
     }
   })
   
-  observeEvent(input$map, {
+  observeEvent({
+    list(updatedData(), input$map)
+  },
+  {
     print('updating map')
     print(input$map)
     df <- updatedData()  # Get the updated data
@@ -383,6 +389,7 @@ server <- function(input, output) {
     start <- Sys.time()
     
     if (input$map == 'heights') {
+      print('plot height')
       to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
       to_plot <- st_drop_geometry(to_plot)
       to_plot <- to_plot %>%
@@ -397,6 +404,7 @@ server <- function(input, output) {
       to_plot <- st_sf(to_plot)
       to_plot <- st_cast(to_plot, "MULTIPOLYGON")
       print(paste0('Group by took: ', round(Sys.time() - start, 1)))
+      start <- Sys.time() 
       leafletProxy("mainPlot", 
                    data = to_plot) %>%
         clearGroup('parcels') %>%
@@ -432,6 +440,8 @@ server <- function(input, output) {
               labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
               opacity = 0.5
             )
+      print(paste0('Render took: ', round(Sys.time() - start, 1)))
+      
         
     } 
     else if (input$map == "potential") {
