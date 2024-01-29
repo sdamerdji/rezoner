@@ -10,10 +10,10 @@ library(waiter)
 library(shinyjs)
 library(sfarrow)
 
-df <- st_read_feather('./four_rezonings.feather')
+df <- st_read_feather('./five_rezonings.feather')
 block_zones <- df %>% 
   mutate(block = stringr::str_sub(MapBlkLot_Master, 1, 4)) %>%
-  dplyr::group_by(M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, block) %>%
+  dplyr::group_by(M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, M5_ZONING, block) %>%
   summarise(.groups='keep') %>%
   ungroup()
 #block_zones <- st_union(block_zones, by_feature=T)
@@ -32,14 +32,14 @@ block_simple <- st_sf(block_simple)
 no_geo_bs <- st_drop_geometry(block_simple)
 df['block'] <- stringr::str_sub(df$mapblklot, 1, 4)
 block_simple <- select(block_simple, M1_ZONING, M2_ZONING, M3_ZONING, 
-                       M4_ZONING, block, primary_key, geometry)
+                       M4_ZONING, M5_ZONING, block, primary_key, geometry)
 block_simple <- st_cast(block_simple, "MULTIPOLYGON")
 st_write_feather(block_simple, './simple_geometries.feather')
 
 no_geo_bs <- st_drop_geometry(block_simple)
 result <- left_join(df, no_geo_bs,
                     by=c('M1_ZONING', 'M2_ZONING', 
-                         'M3_ZONING', 'M4_ZONING', 
+                         'M3_ZONING', 'M4_ZONING',  'M5_ZONING', 
                          'block'))
 result <- select(result, -block)
 st_write_feather(result, './four_rezonings_v2.feather')
