@@ -8,9 +8,10 @@ library(sfarrow)
 library(stringr)
 library(RColorBrewer)
 library(compiler)
+library(profvis)
 
 source('./ui.R', local=T)
-model <- readRDS(file='./light_model.rds')
+model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 
 max_user_rezoning_height <- 240
@@ -68,7 +69,8 @@ union_of_maxdens <- function(df) {
     mutate(ZONING = get_denser_zone(ZONING, M1_ZONING)) %>%
     mutate(ZONING = get_denser_zone(ZONING, M2_ZONING)) %>%
     mutate(ZONING = get_denser_zone(ZONING, M3_ZONING)) %>%
-    mutate(ZONING = get_denser_zone(ZONING, M4_ZONING))
+    mutate(ZONING = get_denser_zone(ZONING, M4_ZONING)) %>%
+    mutate(ZONING = get_denser_zone(ZONING, M5_ZONING))
 }
 
 
@@ -106,6 +108,9 @@ update_df_ <- function(scenario, extend, n_years) {
   }
   if (scenario == 'D') {
     df['ZONING'] <- df$M4_ZONING
+  }
+  if (scenario == 'E') {
+    df['ZONING'] <- df$M5_ZONING
   }
   if (scenario == 'Union') {
     df <- union_of_maxdens(df)
@@ -211,10 +216,9 @@ update_df_ <- function(scenario, extend, n_years) {
   }
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
-  
   # Erase existing zoning indicators for rezoned parcels
   df[, grep("^zp", names(df), value = TRUE)] <- 0
-  
+ 
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
     mutate(zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING),
@@ -261,17 +265,17 @@ update_df_ <- function(scenario, extend, n_years) {
     select(-Envelope_1000_new, -existing_sqft)
   
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
-  df[is.na(df$ZONING),] <- df[is.na(df$ZONING),]  %>%
-    mutate(pdev = 1 - (1-pdev_baseline_1yr)^n_years) %>%
-    mutate(pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years) %>%
-    mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
-    mutate(expected_units = pdev * expected_units_baseline_if_dev) %>%
-    mutate(expected_units_if_dev = expected_units_baseline_if_dev) %>%
-    mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
-    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev)
-  
-  #df <- rbind(df, squo_zoning)
-  
+  df <- df %>%
+    mutate(
+      pdev = if_else(is.na(ZONING), 1 - (1 - pdev_baseline_1yr)^n_years, pdev),
+      pdev_baseline = if_else(is.na(ZONING), 1 - (1 - pdev_baseline_1yr)^n_years, pdev_baseline),
+      pdev_skyscraper = if_else(is.na(ZONING), 1 - (1 - pdev_skyscraper_1yr)^n_years, pdev_skyscraper),
+      expected_units = if_else(is.na(ZONING), pdev * expected_units_baseline_if_dev, expected_units),
+      expected_units_if_dev = if_else(is.na(ZONING), expected_units_baseline_if_dev, expected_units_if_dev),
+      expected_units_baseline = if_else(is.na(ZONING), pdev * expected_units_baseline_if_dev, expected_units_baseline),
+      expected_units_skyscraper = if_else(is.na(ZONING), pdev_skyscraper * expected_units_skyscraper_if_dev, expected_units_skyscraper)
+    )
+
   return(df)
 }
 
@@ -293,13 +297,12 @@ simulate_buildout <- function(to_plot) {
   sf_use_s2(T)
   to_plot <- to_plot[runif(nrow(to_plot)) < to_plot$pdev, ]
   to_plot[,'expected_units_if_dev'] <- to_plot$expected_units_if_dev / max(to_plot$expected_units_if_dev) * 1000
-  centroids <- st_centroid(to_plot)
-  
-  leafletProxy("mainPlot", data = centroids) %>%
+
+  leafletProxy("mainPlot", data = to_plot) %>%
     clearGroup('parcels') %>%
     clearGroup('dynamicMarkers') %>%
-    addCircles(lng = st_coordinates(centroids)[,1],
-               lat = st_coordinates(centroids)[,2],
+    addCircles(lng = to_plot$lng,
+               lat = to_plot$lat,
                radius = ~expected_units_if_dev,
                group = 'dynamicMarkers')
 }
@@ -451,18 +454,17 @@ server <- function(input, output) {
       to_plot$missing_potential <- to_plot$expected_units_skyscraper - to_plot$expected_units
       to_plot$missing_potential <- pmax(to_plot$missing_potential, 0, na.rm=T) / to_plot$ACRES
       to_plot$missing_potential <- log(1 + to_plot$missing_potential)
-      centroids <- st_centroid(to_plot)
       pal_pot <- colorNumeric(
         palette = "Blues",
         domain = to_plot$missing_potential)
       
       #browser()
-      leafletProxy("mainPlot", data = centroids) %>%
+      leafletProxy("mainPlot", data = to_plot) %>%
         clearGroup('parcels') %>%
         clearGroup('dynamicMarkers') %>%
         clearControls() %>%
-        addCircles(lng = st_coordinates(centroids)[,1],
-                         lat = st_coordinates(centroids)[,2],
+        addCircles(lng = to_plot$lng,
+                         lat = to_plot$lat,
                          radius = 1,
                          color = ~pal_pot(missing_potential),
                          group = 'dynamicMarkers',
@@ -471,7 +473,7 @@ server <- function(input, output) {
         addLegend(
           "bottomright",
           title = "Potential",
-          colors = pal_pot(quantile(centroids$missing_potential, na.rm=T)),
+          colors = pal_pot(quantile(to_plot$missing_potential, na.rm=T)),
           labels = as.character(seq(0, 1, 0.25))
         )
       print('done')
@@ -481,17 +483,16 @@ server <- function(input, output) {
       
       print('eu')
       sf_use_s2(T)
-      centroids <- st_centroid(to_plot)
-      centroids$expected_units <- log(centroids$expected_units)
+      to_plot$expected_units <- log(to_plot$expected_units)
       pal_eu <- colorNumeric(
         palette = "Blues",
-        domain = centroids$expected_units)
-      leafletProxy("mainPlot", data = centroids) %>%
+        domain = to_plot$expected_units)
+      leafletProxy("mainPlot", data = to_plot) %>%
         clearGroup('parcels') %>%
         clearGroup('dynamicMarkers') %>%
         clearControls() %>%
-        addCircles(lng = st_coordinates(centroids)[,1],
-                         lat = st_coordinates(centroids)[,2],
+        addCircles(lng = to_plot$lng,
+                   lat = to_plot$lat,
                          color = ~pal_eu(expected_units),
                    radius = 10,
                          group = 'dynamicMarkers',
@@ -500,7 +501,7 @@ server <- function(input, output) {
         addLegend(
           "bottomright",
           title = "E[Units]",
-          colors = pal_eu(quantile(centroids$expected_units, na.rm=T)),
+          colors = pal_eu(quantile(to_plot$expected_units, na.rm=T)),
           labels = as.character(seq(0, 1, 0.25))
         )
     } else if (input$map == 'sim') {
@@ -513,6 +514,15 @@ server <- function(input, output) {
     values <- st_drop_geometry(updatedData()) %>% 
       mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
       group_by(sup_name) %>%
+      summarise(units = sum(net_units, na.rm=T)) %>%
+      arrange(desc(units))
+    return(paste0(format(values$sup_name, width=15), "\t", round(values$units), ' units\n'))
+  })
+  
+  output$most_units <- renderText({
+    values <- st_drop_geometry(updatedData()) %>% 
+      mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
+      arrange(net_units) %>%
       summarise(units = sum(net_units, na.rm=T)) %>%
       arrange(desc(units))
     return(paste0(format(values$sup_name, width=15), "\t", round(values$units), ' units\n'))
@@ -562,5 +572,3 @@ server <- function(input, output) {
 
 
 shinyApp(ui = ui, server = server)
-
-

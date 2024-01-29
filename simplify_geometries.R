@@ -9,7 +9,7 @@ library(leaflet)
 library(waiter)
 library(shinyjs)
 library(sfarrow)
-
+setwd('~/Desktop/rezoner2/')
 df <- st_read_feather('./five_rezonings.feather')
 block_zones <- df %>% 
   mutate(block = stringr::str_sub(MapBlkLot_Master, 1, 4)) %>%

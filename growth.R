@@ -11,7 +11,7 @@ sf_use_s2(FALSE)
 #4.	Rm if less than 2500 sq ft
 
 
-
+setwd('~/Desktop/rezoner2/rezoner')
 df <- st_read_feather('../four_rezonings_v2.feather')
 
 
@@ -117,10 +117,10 @@ results2 <- select(results2, -c("sup_dist_pad", "sup_dist_num",
               "data_loaded_at", "sup_dist", "data_as_of"))
 
 #results <- st_read_feather('../four_rezonings_v3.feather')
-results <- results2
-points <- st_coordinates(st_centroid(results))
-results[, 'lng'] <- points[,1]
-results[, 'lat'] <- points[,2]
+#results <- results2
+points <- st_coordinates(st_centroid(results2))
+results2[, 'lng'] <- points[,1]
+results2[, 'lat'] <- points[,2]
 
 
-st_write_feather(results, '../four_rezonings_v3.feather')
+st_write_feather(results2, '../four_rezonings_v3.feather')

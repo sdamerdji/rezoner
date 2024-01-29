@@ -17,13 +17,14 @@ ui <- fluidPage(
     sidebarLayout(
       sidebarPanel(
         selectInput("scenario", "Upzoning Strategies:",
-                    choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "D",
+                    choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "E",
+                      "Fall 2023 SF Planning Proposal for Housing Element Rezoning" = "D",
                                 "Housing Element Rezoning Scenario A" = "A",
                                 "Housing Element Rezoning Scenario B" = "B",
                                 "Housing Element Rezoning Scenario C" = "C",
                                 "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
                                 "Parisian zoning in low density neighborhoods" = "Parisian"),
-                    selected = 'D'),
+                    selected = 'E'),
         # radioButtons("customize_map", "Customize this rezoning:",
         #              choices = c("No" = "no", "Yes" = "yes"),
         #              selected = "no"),
@@ -98,6 +99,7 @@ ui <- fluidPage(
         leafletOutput("mainPlot", height = "600px"),
         span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
+        span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
         height = "600px"
       )

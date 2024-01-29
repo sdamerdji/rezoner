@@ -1,6 +1,7 @@
 library(dplyr)
 library(sf)
 # Run this script from rezoner subdirectory
+setwd('~/Desktop/rezoner2/rezoner')
 df <- st_read_feather('../four_rezonings_v3.feather')
 tax <- st_read('../Assessor Historical Secured Property Tax Rolls_20240121.geojson')
 
@@ -9,7 +10,7 @@ parcels_to_exclude <- c('State of California Property', 'Under Water Lot')
 bad_parcels <- tax %>%
   filter((property_class_code_definition %in% parcels_to_exclude) | 
            (exemption_code_definition == 'Cemetary') | (block == '9900') |
-           (block == '0006' & lot == '001'))
+           (block == '0006' & lot == '001') | (block == '1300' & lot == '001'))
 
 # Take union of points of bad parcels
 to_exclude <- st_union(bad_parcels)
@@ -17,6 +18,8 @@ to_exclude <- st_union(bad_parcels)
 # Remove from df
 filtered <- st_filter(df, to_exclude, .predicate=st_disjoint)
 nrow(filtered)
+
+filtered <- filtered[filtered$ex_height2024 < 1111,]
 
 # Check that none are being upzoned already
 # removed <- st_filter(df, to_exclude)
