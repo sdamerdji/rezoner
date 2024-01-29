@@ -1,5 +1,6 @@
 library(sf)
 library(stringr)
+library(sfarrow)
 sf_use_s2(FALSE)
 
 
@@ -107,12 +108,19 @@ results[,'expected_units_skyscraper_if_dev'] <- df$expected_units_skyscraper_if_
 results[,'pdev_skyscraper_1yr'] <- predictions.16_skyscraper
 
 #results <- st_read_feather('./four_rezonings_v3.feather')
-supervisors <- st_read('./Supervisor Districts (2022)_20240124.geojson')
+supervisors <- st_read('../Supervisor Districts (2022)_20240124.geojson')
 
 nrow(results)
 results2 <- st_join(results, supervisors, largest=T)
 nrow(results2)
 results2 <- select(results2, -c("sup_dist_pad", "sup_dist_num", 
               "data_loaded_at", "sup_dist", "data_as_of"))
-st_read()
-st_write_feather(results2, '../four_rezonings_v3.feather')
+
+#results <- st_read_feather('../four_rezonings_v3.feather')
+results <- results2
+points <- st_coordinates(st_centroid(results))
+results[, 'lng'] <- points[,1]
+results[, 'lat'] <- points[,2]
+
+
+st_write_feather(results, '../four_rezonings_v3.feather')
