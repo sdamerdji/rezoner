@@ -31,17 +31,16 @@ parisian <- paste0(parisian_height, "' Height Allowed")
 
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
-
   df[(!is.na(df$ZONING)) & df$ZONING == fourplex, 'ZONING'] <- parisian
   df[(!is.na(df$ZONING)) & df$ZONING == decontrol, 'ZONING'] <- parisian
   df[(!is.na(df$ZONING))
-     & as.numeric(str_extract(df$ZONING, "\\d+")) < 75, 'ZONING'] <- parisian
+     & as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height, 'ZONING'] <- parisian
   
-  # This just ensures it's one of the parcels in an existing SF rezoning map
   df[is.na(df$ZONING) & (!is.na(df$M1_ZONING)| 
                           !is.na(df$M2_ZONING)|
                            !is.na(df$M3_ZONING)|
-                              !is.na(df$M4_ZONING)), 'ZONING'] <- parisian
+                              !is.na(df$M4_ZONING)|
+                           !is.na(df$M5_ZONING)), 'ZONING'] <- parisian
   df
 }
 
@@ -66,11 +65,11 @@ get_denser_zone <- function(current_zoning, new_zoning) {
 
 union_of_maxdens <- function(df) {
   df %>% 
-    mutate(ZONING = get_denser_zone(ZONING, M1_ZONING)) %>%
-    mutate(ZONING = get_denser_zone(ZONING, M2_ZONING)) %>%
-    mutate(ZONING = get_denser_zone(ZONING, M3_ZONING)) %>%
-    mutate(ZONING = get_denser_zone(ZONING, M4_ZONING)) %>%
-    mutate(ZONING = get_denser_zone(ZONING, M5_ZONING))
+    mutate(ZONING = get_denser_zone(ZONING, M1_ZONING),
+           ZONING = get_denser_zone(ZONING, M2_ZONING),
+           ZONING = get_denser_zone(ZONING, M3_ZONING),
+           ZONING = get_denser_zone(ZONING, M4_ZONING),
+           ZONING = get_denser_zone(ZONING, M5_ZONING))
 }
 
 
@@ -116,7 +115,7 @@ update_df_ <- function(scenario, extend, n_years) {
     df <- union_of_maxdens(df)
   }
   if (scenario == 'Parisian') {
-    df <- union_of_maxdens(df)
+    df['ZONING'] <- df$M5_ZONING
     df <- paris(df)
   }
   boost <- 20
@@ -216,66 +215,61 @@ update_df_ <- function(scenario, extend, n_years) {
   }
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
-  # Erase existing zoning indicators for rezoned parcels
-  df[, grep("^zp", names(df), value = TRUE)] <- 0
- 
+
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
-    mutate(zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING),
+    mutate(zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
+           zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
+           zp_Public = if_else(!is.na(ZONING), 0, zp_Public),
+           zp_Redev = if_else(!is.na(ZONING), 0, zp_Redev),
+           zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2),
+           zp_RH3_RM1 = if_else(!is.na(ZONING), 0, zp_RH3_RM1),
+           zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING),
                                        1,
-                                       zp_FormBasedMulti))
-  
-  df <- df %>%
-    mutate(zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, zp_DensRestMulti)) %>%
-    mutate(height = as.numeric(str_extract(ZONING, "\\d+"))) %>%
-    mutate(height = height_setter(ZONING, height)) %>%
-    mutate(
-      # See page 44 of Appendix B
-      Envelope_1000_new = case_when(
-        height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
-        ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
-        ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
-        TRUE ~ NA_real_
-      ),
-      # no downzoning allowed
-      existing_sqft = Envelope_1000 / Upzone_Ratio,
-      Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
-      Upzone_Ratio = Envelope_1000 / existing_sqft
-    ) %>%
-    mutate(expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850)
+                                       0),
+           zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0),
+           height = as.numeric(str_extract(ZONING, "\\d+")),
+           height = height_setter(ZONING, height),
+           Envelope_1000_new = case_when(
+              height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
+              ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
+              ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
+              TRUE ~ NA_real_
+            ),
+            # no downzoning allowed
+            existing_sqft = Envelope_1000 / Upzone_Ratio,
+            Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
+            Upzone_Ratio = Envelope_1000 / existing_sqft,
+            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850
+      )
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
     df <- df %>%
-      mutate(MAXDENS = abs(MAXDENS)) %>%
-      mutate(du_allowed = ACRES * MAXDENS) %>%
-      mutate(expected_units_if_dev = ifelse((!is.na(du_allowed)) & (expected_units_if_dev > du_allowed),
+      mutate(MAXDENS = abs(MAXDENS),
+             du_allowed = ACRES * MAXDENS,
+             expected_units_if_dev = ifelse((!is.na(du_allowed)) & (expected_units_if_dev > du_allowed),
                                                 du_allowed, expected_units_if_dev))
   }
   
   predictions.16 <- predict(model, newdata = df, type = "response")
   
   df <- df %>%
-    mutate(pdev = 1 - (1-predictions.16)^n_years) %>% 
-    mutate(pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years) %>%
-    mutate(pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years) %>%
-    mutate(expected_units = pdev * expected_units_if_dev) %>%
-    mutate(expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev) %>%
-    mutate(expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev) %>%
-    select(-Envelope_1000_new, -existing_sqft)
-  
-  print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
-  df <- df %>%
     mutate(
-      pdev = if_else(is.na(ZONING), 1 - (1 - pdev_baseline_1yr)^n_years, pdev),
-      pdev_baseline = if_else(is.na(ZONING), 1 - (1 - pdev_baseline_1yr)^n_years, pdev_baseline),
-      pdev_skyscraper = if_else(is.na(ZONING), 1 - (1 - pdev_skyscraper_1yr)^n_years, pdev_skyscraper),
-      expected_units = if_else(is.na(ZONING), pdev * expected_units_baseline_if_dev, expected_units),
-      expected_units_if_dev = if_else(is.na(ZONING), expected_units_baseline_if_dev, expected_units_if_dev),
-      expected_units_baseline = if_else(is.na(ZONING), pdev * expected_units_baseline_if_dev, expected_units_baseline),
-      expected_units_skyscraper = if_else(is.na(ZONING), pdev_skyscraper * expected_units_skyscraper_if_dev, expected_units_skyscraper)
-    )
-
+      pdev = if_else(is.na(ZONING), 
+                     1 - (1 - pdev_baseline_1yr)^n_years,
+                     1 - (1-predictions.16)^n_years),
+      pdev_baseline = 1 - (1-pdev_baseline_1yr)^n_years,
+      pdev_skyscraper = 1 - (1-pdev_skyscraper_1yr)^n_years,
+      expected_units_if_dev = if_else(is.na(ZONING), 
+                                      expected_units_baseline_if_dev, 
+                                      expected_units_if_dev),
+      expected_units = pdev * expected_units_if_dev,
+      expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev,
+      expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev
+    ) %>%
+    select(-Envelope_1000_new, -existing_sqft)
+  print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
 }
 
@@ -516,16 +510,24 @@ server <- function(input, output) {
       group_by(sup_name) %>%
       summarise(units = sum(net_units, na.rm=T)) %>%
       arrange(desc(units))
-    return(paste0(format(values$sup_name, width=15), "\t", round(values$units), ' units\n'))
+    allocations <- paste0(format(values$sup_name, width=15), "\t", round(values$units), " units")
+    allocations_string <- paste(allocations, collapse="\n")
+    final_output <- paste0('Allocation by Supervisor\n', allocations_string)
+    
+    return(final_output)
   })
   
   output$most_units <- renderText({
     values <- st_drop_geometry(updatedData()) %>% 
       mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
-      arrange(net_units) %>%
-      summarise(units = sum(net_units, na.rm=T)) %>%
-      arrange(desc(units))
-    return(paste0(format(values$sup_name, width=15), "\t", round(values$units), ' units\n'))
+      arrange(desc(net_units)) %>%
+      head(5) %>%
+      select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
+    return(paste0('Lot ', format(values$mapblklot), 
+                  " yields ", round(values$expected_units), 
+                  ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
+                  'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
+                  ' acres \n'))
   })
   
   output$helpText <- renderText({

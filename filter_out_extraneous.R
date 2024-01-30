@@ -11,6 +11,7 @@ bad_parcels <- tax %>%
   filter((property_class_code_definition %in% parcels_to_exclude) | 
            (exemption_code_definition == 'Cemetary') | (block == '9900') |
            (block == '0006' & lot == '001') | (block == '1300' & lot == '001'))
+  # these are for usf campuses. check what sf does          | (block = '1145' & lot = '003') | (block == '1107' & lot=='008'))
 
 # Take union of points of bad parcels
 to_exclude <- st_union(bad_parcels)
