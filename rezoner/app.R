@@ -31,15 +31,15 @@ parisian <- paste0(parisian_height, "' Height Allowed")
 
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
-  df[(!is.na(df$ZONING)) & df$ZONING == fourplex, 'ZONING'] <- parisian
-  df[(!is.na(df$ZONING)) & df$ZONING == decontrol, 'ZONING'] <- parisian
-  df[(!is.na(df$ZONING))
-     & as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height, 'ZONING'] <- parisian
-  
-  df[is.na(df$ZONING) & (!is.na(df$M1_ZONING)| 
-                          !is.na(df$M2_ZONING)|
-                           !is.na(df$M3_ZONING)|
-                              !is.na(df$M4_ZONING)|
+  df[(!is.na(df$ZONING)) 
+     & ((df$ZONING == fourplex) | 
+       (df$ZONING == decontrol) | 
+       (as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height)), 'ZONING'] <- parisian
+
+  df[is.na(df$ZONING) & (!is.na(df$M1_ZONING) | 
+                           !is.na(df$M2_ZONING) |
+                           !is.na(df$M3_ZONING) |
+                           !is.na(df$M4_ZONING) |
                            !is.na(df$M5_ZONING)), 'ZONING'] <- parisian
   df
 }
@@ -358,7 +358,7 @@ server <- function(input, output) {
     if (input$map == 'sim') {
       df <- updatedData()
       df['block'] <- str_sub(df$mapblklot, 1, 4)
-      df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
+      df$n_stories <- (df$height - 5) %/% 10
       df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
       df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
       to_plot <- filter(df, !is.na(df$ZONING) & !is.na(expected_units) & expected_units > 0)
@@ -389,17 +389,22 @@ server <- function(input, output) {
       print('plot height')
       to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
       to_plot <- st_drop_geometry(to_plot)
+      print(paste0('pre group by took: ', round(Sys.time() - start, 1)))
+      
       to_plot <- to_plot %>%
         group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
-        summarise(expected_units = sum(expected_units),
+        summarise(
                   pdev = mean(pdev),
                   expected_units_if_dev = sum(expected_units_if_dev),
                   n_stories = first(n_stories),
+                  expected_units = sum(expected_units),
+                  expected_units_baseline = sum(expected_units_baseline),
+                  net_units = pmax(expected_units - expected_units_baseline, 0, na.rm=T),
                   .groups='keep')
+      
       to_plot <- st_sf(left_join(to_plot, geometries, 
                                  by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
-      to_plot <- st_sf(to_plot)
-      to_plot <- st_cast(to_plot, "MULTIPOLYGON")
+      #to_plot <- st_cast(to_plot, "MULTIPOLYGON")
       print(paste0('Group by took: ', round(Sys.time() - start, 1)))
       start <- Sys.time() 
       leafletProxy("mainPlot", 
@@ -418,7 +423,8 @@ server <- function(input, output) {
             ZONING,
             '<br>Block:', block,
             "<br>Expected Units:",
-            formatC(round(expected_units, 1), format='f', big.mark=',', digits=1),
+            formatC(round(net_units, 1),
+                    format='f', big.mark=',', digits=1),
             '<br>P(Dev):',
             formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
             '%',
@@ -447,10 +453,10 @@ server <- function(input, output) {
       to_plot <- df
       to_plot$missing_potential <- to_plot$expected_units_skyscraper - to_plot$expected_units
       to_plot$missing_potential <- pmax(to_plot$missing_potential, 0, na.rm=T) / to_plot$ACRES
-      to_plot$missing_potential <- log(1 + to_plot$missing_potential)
+      to_plot$missing_potential <- log10(1 + to_plot$missing_potential)
       pal_pot <- colorNumeric(
         palette = "Blues",
-        domain = to_plot$missing_potential)
+        domain = c(0, 5))
       
       #browser()
       leafletProxy("mainPlot", data = to_plot) %>%
@@ -459,16 +465,31 @@ server <- function(input, output) {
         clearControls() %>%
         addCircles(lng = to_plot$lng,
                          lat = to_plot$lat,
-                         radius = 1,
+                         radius = ~pmin(to_plot$ACRES, .5, na.rm=T) * sqrt(4046.86),
                          color = ~pal_pot(missing_potential),
                          group = 'dynamicMarkers',
-                         fillOpacity = .1, 
-                         weight = .1) %>%
+                         fillOpacity = 1, 
+                         weight = 0,
+                   popup = ~ paste(
+                     "New Zoning:",
+                     ZONING,
+                     '<br>APN:', mapblklot,
+                     '<br>Missing Potential per Acre:', round(10**(missing_potential - 1), 1),
+                     "<br>Expected Units:",
+                     formatC(round(expected_units, 1),
+                             format='f', big.mark=',', digits=1),
+                     '<br>P(Dev):',
+                     formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
+                     '%',
+                     '<br>E(Units | Dev):',
+                     formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
+                   )) %>%
+        
         addLegend(
           "bottomright",
           title = "Potential",
-          colors = pal_pot(quantile(to_plot$missing_potential, na.rm=T)),
-          labels = as.character(seq(0, 1, 0.25))
+          colors = pal_pot(c(1, 2, 3, 4)),
+          labels = c('<10 du/ac', '10-100 du/ac', '100-1000 du/ac', '1000+ du/ac')
         )
       print('done')
     } 
@@ -523,11 +544,12 @@ server <- function(input, output) {
       arrange(desc(net_units)) %>%
       head(5) %>%
       select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
-    return(paste0('Lot ', format(values$mapblklot), 
-                  " yields ", round(values$expected_units), 
+    yields <- paste0('Lot ', format(values$mapblklot), 
+                  " yields ", round(values$net_units), 
                   ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
                   'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
-                  ' acres \n'))
+                  ' acres\n', collapse='')
+    return(paste0('Top Lots\n', yields))
   })
   
   output$helpText <- renderText({
