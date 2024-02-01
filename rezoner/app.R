@@ -92,7 +92,6 @@ update_df_ <- function(scenario, extend, n_years) {
   # if extend affh, then where high opp but not already upzoned, upzone to either floor (fourplex) or height + 20
   print(scenario)
   start <- Sys.time()
-
   if (scenario == 'A') {
     df['ZONING'] <- df$M1_ZONING
     df['MAXDENS'] <- df$M1_MAXDENS
@@ -266,7 +265,8 @@ update_df_ <- function(scenario, extend, n_years) {
                                       expected_units_if_dev),
       expected_units = pdev * expected_units_if_dev,
       expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev,
-      expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev
+      expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev,
+      net_units = pmax(expected_units - pdev_baseline, 0, na.rm=T)
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
@@ -399,7 +399,7 @@ server <- function(input, output) {
                   n_stories = first(n_stories),
                   expected_units = sum(expected_units),
                   expected_units_baseline = sum(expected_units_baseline),
-                  net_units = pmax(expected_units - expected_units_baseline, 0, na.rm=T),
+                  net_units = sum(net_units),
                   .groups='keep')
       
       to_plot <- st_sf(left_join(to_plot, geometries, 
@@ -494,30 +494,41 @@ server <- function(input, output) {
       print('done')
     } 
     else if (input$map == 'E[u]') {
-      to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
-      
-      print('eu')
+      to_plot <- filter(df, !is.na(ZONING) & !is.na(net_units) & net_units > 0)
       sf_use_s2(T)
-      to_plot$expected_units <- log(to_plot$expected_units)
+      to_plot$net_units <- log10(1 + (to_plot$net_units/to_plot$ACRES))
       pal_eu <- colorNumeric(
         palette = "Blues",
-        domain = to_plot$expected_units)
+        domain = c(0, 3))
       leafletProxy("mainPlot", data = to_plot) %>%
         clearGroup('parcels') %>%
         clearGroup('dynamicMarkers') %>%
         clearControls() %>%
         addCircles(lng = to_plot$lng,
                    lat = to_plot$lat,
-                         color = ~pal_eu(expected_units),
-                   radius = 10,
+                   color = ~pal_eu(pmin(net_units, 3)),
+                   radius =  ~pmin(ACRES, .5, na.rm=T) * sqrt(4046.86),
                          group = 'dynamicMarkers',
-                         fillOpacity = .1, 
-                         weight = .1) %>%
+                         fillOpacity = ~(ifelse(net_units < 1, .1, 1)), 
+                         weight = 0,
+                   popup = ~ paste(
+                     "New Zoning:",
+                     ZONING,
+                     '<br>APN:', mapblklot,
+                     "<br>Expected Units:",
+                     formatC(round(net_units, 1),
+                             format='f', big.mark=',', digits=1),
+                     '<br>P(Dev):',
+                     formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
+                     '%',
+                     '<br>E(Units | Dev):',
+                     formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
+                   )) %>%
         addLegend(
           "bottomright",
-          title = "E[Units]",
-          colors = pal_eu(quantile(to_plot$expected_units, na.rm=T)),
-          labels = as.character(seq(0, 1, 0.25))
+          title = "Expected Units Added per Acre",
+          colors = pal_eu(c(1, 2, 3)),
+          labels = c('<10 units', '10-100 units', '100+ units')
         )
     } else if (input$map == 'sim') {
       to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
@@ -527,7 +538,6 @@ server <- function(input, output) {
   
   output$supervisors <- renderText({
     values <- st_drop_geometry(updatedData()) %>% 
-      mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
       group_by(sup_name) %>%
       summarise(units = sum(net_units, na.rm=T)) %>%
       arrange(desc(units))
@@ -540,7 +550,6 @@ server <- function(input, output) {
   
   output$most_units <- renderText({
     values <- st_drop_geometry(updatedData()) %>% 
-      mutate(net_units = pmax(expected_units - expected_units_baseline, 0, na.rm = T)) %>%
       arrange(desc(net_units)) %>%
       head(5) %>%
       select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
@@ -581,6 +590,8 @@ server <- function(input, output) {
     }
     return(result)
   })
+  
+  
   
   # observe({
   #   if(input$customize_map == "yes") {
