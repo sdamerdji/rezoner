@@ -75,6 +75,8 @@ union_of_maxdens <- function(df) {
 
 height_setter <- function(ZONING, height) {
   dplyr::case_when(
+    ZONING == fourplex ~ 40,
+    ZONING == decontrol ~ 40,
     !is.na(ZONING) & is.na(height) ~ 40,
     .default = height
   )
@@ -212,6 +214,34 @@ update_df_ <- function(scenario, extend, n_years) {
                              paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
   }
+  if (extend == 'extend_broockman1') {
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) & ex_height2024 <= parisian_height,
+                             parisian,
+                             ZONING))
+  }
+  if (extend == 'extend_broockman2') {
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
+                               (ex_height2024 <= parisian_height) & (ACRES >= 0.0573921),
+                             parisian,
+                             ZONING))
+  }
+  if (extend == 'extend_broockman3') {
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
+                               (ex_height2024 <= parisian_height) & (ACRES >= 0.1147842),
+                             parisian,
+                             ZONING))
+  }
+  if (extend == 'extend_broockman4') {
+    df <- df %>%
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
+                               (!zp_DensRestMulti & !zp_FormBasedMulti) &
+                               (ex_height2024 <= parisian_height) & (ACRES >= 0.1147842),
+                             parisian,
+                             ZONING))
+  }
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
 
@@ -266,7 +296,7 @@ update_df_ <- function(scenario, extend, n_years) {
       expected_units = pdev * expected_units_if_dev,
       expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev,
       expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev,
-      net_units = pmax(expected_units - pdev_baseline, 0, na.rm=T)
+      net_units = pmax(expected_units - expected_units_baseline, 0, na.rm=T)
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
@@ -391,6 +421,9 @@ server <- function(input, output) {
       to_plot <- st_drop_geometry(to_plot)
       print(paste0('pre group by took: ', round(Sys.time() - start, 1)))
       
+      # TODO: there is a fundamental problem I think in this code that I use
+      # a group by that includes ZONING
+      # I need to filter out parcels before simplify_geometries.R
       to_plot <- to_plot %>%
         group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
         summarise(
@@ -403,7 +436,17 @@ server <- function(input, output) {
                   .groups='keep')
       
       to_plot <- st_sf(left_join(to_plot, geometries, 
-                                 by=c('block', 'M1_ZONING', 'M2_ZONING', 'M3_ZONING', 'M4_ZONING')))
+                                 by=c('block', 'M1_ZONING', 'M2_ZONING',
+                                      'M3_ZONING', 'M4_ZONING')))
+      # TODO: Fix this in simplify_geometries.R
+      # unmatched_geos <- geometries[!(geometries$geometry %in% to_plot$geometry),]
+      # unmatched_blocks <- st_drop_geometry(to_plot[st_is_empty(to_plot),])
+      # if (nrow(unmatched_blocks) > 1) {
+      #   extra <- st_sf(left_join(unmatched_blocks,  
+      #                      select(unmatched_geos, 'block'),
+      #                      by=c('block')))
+      #   to_plot <- rbind(extra, to_plot)
+      # }
       #to_plot <- st_cast(to_plot, "MULTIPOLYGON")
       print(paste0('Group by took: ', round(Sys.time() - start, 1)))
       start <- Sys.time() 

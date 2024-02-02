@@ -29,12 +29,12 @@ filtered <- filtered[filtered$ex_height2024 < 1111,]
 # sum(!is.na(removed$M3_ZONING))
 # sum(!is.na(removed$M4_ZONING)) # Ok so one parcel is wrongly removed. need to add back after the fact
 
-st_write_feather(filtered, './four_rezonings_v4.feather')
-df <- st_read_feather('./four_rezonings_v4.feather')
-colnames(df)
-df <- df %>% select(-MapBlkLot_Master, -Developed,
+
+colnames(filtered)
+filtered <- filtered %>% select(-MapBlkLot_Master, -Developed,
               -M4_height, -M5_height, -EX_USE,
               -M1_CAP, -M2_CAP, -M3_CAP,
               -M1_GP_TYPE, -M2_GP_TYPE, -M3_GP_TYPE, -VACANT, -primary_key)
-df <- df %>% select(-sup_dist_name, -EX_GP_TYPE, -EX_ZONING)
+filtered <- filtered %>% select(-sup_dist_name, -EX_GP_TYPE, -EX_ZONING)
 st_write_feather(filtered, './four_rezonings_v4.feather')
+
