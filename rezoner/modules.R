@@ -4,7 +4,11 @@ requirementUI <- function(id) {
   ns <- NS(id)
   tagList(
     selectInput(ns("is_in"), NULL, choices = c("in", "not in"), selected = "in"),
-    selectInput(ns("parcel_filter"), NULL, choices = c("Transit", "Commercial Corridor", "Economic Opportunity", "PEG", "Already Rezoned")),
+    selectInput(ns("parcel_filter"), NULL, choices = c("Transit",
+                                                       "Commercial Corridor", 
+                                                       "Economic Opportunity", 
+                                                       "PEG",
+                                                       "Already Rezoned")),
     uiOutput(ns("dynamic_slider")) # Placeholder for dynamic slider UI
   )
 }

@@ -34,9 +34,9 @@ paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
   df[(!is.na(df$ZONING)) 
      & ((df$ZONING == fourplex) | 
-       (df$ZONING == decontrol) | 
-       (as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height)), 'ZONING'] <- parisian
-
+          (df$ZONING == decontrol) | 
+          (as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height)), 'ZONING'] <- parisian
+  
   df[is.na(df$ZONING) & (!is.na(df$M1_ZONING) | 
                            !is.na(df$M2_ZONING) |
                            !is.na(df$M3_ZONING) |
@@ -88,7 +88,7 @@ upzone <- function(df) {
   sum(pmax(df$expected_units - df$expected_units_baseline, 0, na.rm = T))
 }
 
-update_df_ <- function(scenario, extend, n_years) {
+update_df_ <- function(scenario, extend, n_years, user_rezonings) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
@@ -245,7 +245,16 @@ update_df_ <- function(scenario, extend, n_years) {
   }
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
-
+  #browser()
+  
+  # USER REZONING
+  for (list_item in user_rezonings) {
+      df <- mutate(df, 
+                   ZONING = ifelse(eval(parse(text=list_item$new_expr)),
+                                   list_item$new_height_description, 
+                                   ZONING))
+    
+  }
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
     mutate(zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
@@ -261,18 +270,18 @@ update_df_ <- function(scenario, extend, n_years) {
            height = as.numeric(str_extract(ZONING, "\\d+")),
            height = height_setter(ZONING, height),
            Envelope_1000_new = case_when(
-              height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
-              ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
-              ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
-              TRUE ~ NA_real_
-            ),
-            # no downzoning allowed
-            existing_sqft = Envelope_1000 / Upzone_Ratio,
-            Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
-            Envelope_1000 = pmin(Envelope_1000, max_envelope, na.rm=T),
-            Upzone_Ratio = Envelope_1000 / existing_sqft,
-            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
-      )
+             height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
+             ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
+             ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
+             TRUE ~ NA_real_
+           ),
+           # no downzoning allowed
+           existing_sqft = Envelope_1000 / Upzone_Ratio,
+           Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
+           Envelope_1000 = pmin(Envelope_1000, max_envelope, na.rm=T),
+           Upzone_Ratio = Envelope_1000 / existing_sqft,
+           expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
+    )
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
@@ -280,7 +289,7 @@ update_df_ <- function(scenario, extend, n_years) {
       mutate(MAXDENS = abs(MAXDENS),
              du_allowed = ACRES * MAXDENS,
              expected_units_if_dev = ifelse((!is.na(du_allowed)) & (expected_units_if_dev > du_allowed),
-                                                du_allowed, expected_units_if_dev))
+                                            du_allowed, expected_units_if_dev))
   }
   
   predictions.16 <- predict(model, newdata = df, type = "response")
@@ -323,7 +332,7 @@ simulate_buildout <- function(to_plot) {
   sf_use_s2(T)
   to_plot <- to_plot[runif(nrow(to_plot)) < to_plot$pdev, ]
   to_plot[,'expected_units_if_dev'] <- to_plot$expected_units_if_dev / max(to_plot$expected_units_if_dev) * 1000
-
+  
   leafletProxy("mainPlot", data = to_plot) %>%
     clearGroup('parcels') %>%
     clearGroup('dynamicMarkers') %>%
@@ -336,10 +345,11 @@ simulate_buildout <- function(to_plot) {
 # Server logic
 server <- function(input, output, session) {
   updatedData <- reactiveVal(NA)
+  user_rezoning <- reactiveValues(lists=list())
   
   # Update the reactive value whenever input features change
-  observeEvent(c(input$scenario, input$extend, input$years_slider), {
-    updatedData(update_df(input$scenario, input$extend, input$years_slider))
+  observeEvent(c(input$scenario, input$extend, input$years_slider, user_rezoning$lists), {
+    updatedData(update_df(input$scenario, input$extend, input$years_slider, user_rezoning$lists))
   })
   
   output$mainPlot <- renderLeaflet({
@@ -353,7 +363,7 @@ server <- function(input, output, session) {
       # Add the multipolygon layer when overlay is TRUE
       leafletProxy("mainPlot") %>%
         addPolygons(data = multipolygon, fill = NA, group="lldl", weight=.5)
-
+      
     } else {
       leafletProxy("mainPlot") %>%
         clearGroup("lldl")
@@ -380,7 +390,7 @@ server <- function(input, output, session) {
       # Add the multipolygon layer when overlay is TRUE
       leafletProxy("mainPlot") %>%
         addPolygons(data = multipolygon, fill = NA, group="affh", color='black', weight=1)
-
+      
     } else {
       leafletProxy("mainPlot") %>%
         clearGroup("affh")
@@ -405,14 +415,14 @@ server <- function(input, output, session) {
     print('updating map')
     print(input$map)
     df <- updatedData()  # Get the updated data
-
+    
     
     # Group by
     df['block'] <- str_sub(df$mapblklot, 1, 4)
     df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
     df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
     df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
-
+    
     
     # Render
     start <- Sys.time()
@@ -428,13 +438,13 @@ server <- function(input, output, session) {
       to_plot <- to_plot %>%
         group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
         summarise(
-                  pdev = mean(pdev),
-                  expected_units_if_dev = sum(expected_units_if_dev),
-                  n_stories = first(n_stories),
-                  expected_units = sum(expected_units),
-                  expected_units_baseline = sum(expected_units_baseline),
-                  net_units = sum(net_units),
-                  .groups='keep')
+          pdev = mean(pdev),
+          expected_units_if_dev = sum(expected_units_if_dev),
+          n_stories = first(n_stories),
+          expected_units = sum(expected_units),
+          expected_units_baseline = sum(expected_units_baseline),
+          net_units = sum(net_units),
+          .groups='keep')
       
       to_plot <- st_sf(left_join(to_plot, geometries, 
                                  by=c('block', 'M1_ZONING', 'M2_ZONING',
@@ -480,16 +490,16 @@ server <- function(input, output, session) {
             textsize = "13px",
             direction = "auto"
           )) %>%
-            addLegend(
-              "bottomright",
-              title = "Base Zoning",
-              colors = pal(c(1, 5, 8, 10, 20)),
-              labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
-              opacity = 0.5
-            )
+        addLegend(
+          "bottomright",
+          title = "Base Zoning",
+          colors = pal(c(1, 5, 8, 10, 20)),
+          labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
+          opacity = 0.5
+        )
       print(paste0('Render took: ', round(Sys.time() - start, 1)))
       
-        
+      
     } 
     else if (input$map == "potential") {
       print('wya')
@@ -507,12 +517,12 @@ server <- function(input, output, session) {
         clearGroup('dynamicMarkers') %>%
         clearControls() %>%
         addCircles(lng = to_plot$lng,
-                         lat = to_plot$lat,
-                         radius = ~pmin(to_plot$ACRES, .5, na.rm=T) * sqrt(4046.86),
-                         color = ~pal_pot(missing_potential),
-                         group = 'dynamicMarkers',
-                         fillOpacity = 1, 
-                         weight = 0,
+                   lat = to_plot$lat,
+                   radius = ~pmin(to_plot$ACRES, .5, na.rm=T) * sqrt(4046.86),
+                   color = ~pal_pot(missing_potential),
+                   group = 'dynamicMarkers',
+                   fillOpacity = 1, 
+                   weight = 0,
                    popup = ~ paste(
                      "New Zoning:",
                      ZONING,
@@ -551,9 +561,9 @@ server <- function(input, output, session) {
                    lat = to_plot$lat,
                    color = ~pal_eu(pmin(net_units, 3)),
                    radius =  ~pmin(ACRES, .5, na.rm=T) * sqrt(4046.86),
-                         group = 'dynamicMarkers',
-                         fillOpacity = ~(ifelse(net_units < 1, .1, 1)), 
-                         weight = 0,
+                   group = 'dynamicMarkers',
+                   fillOpacity = ~(ifelse(net_units < 1, .1, 1)), 
+                   weight = 0,
                    popup = ~ paste(
                      "New Zoning:",
                      ZONING,
@@ -661,24 +671,45 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$rezone, {
+    new_height <- 5 + 10*input$stories
+    new_height_description <- paste0(new_height, "' Height Allowed")
+    new_expr <- paste0('TRUE & (', new_height, ' > ex_height2024)')
+    #browser()
+    for (prefix in requirements$ids) {
+      to_add <- NULL
+      if (input[[paste0(prefix, '-parcel_filter')]] == 'PEG') {
+        to_add <- 'peg'
+      }
+      else if (input[[paste0(prefix, '-parcel_filter')]] == 'Already Rezoned') {
+        to_add <- '!is.na(ZONING)'
+      }
+      if (input[[paste0(prefix, '-is_in')]] == 'not in') {
+        to_add <- paste0('(!', to_add, ')')
+      }
+      new_expr <- paste(new_expr, to_add, sep=' & ')
+    }
+    user_rezoning[['lists']][[paste0('list', 
+                          length(user_rezoning$lists))]] <- list(new_height_description = new_height_description, 
+                                                           new_expr = new_expr)
+    
     # Correctly remove each dynamically added component
     lapply(requirements$ids, function(id) removeUI(selector = paste0("#", id)))
     requirements$count <- 0
     requirements$ids <- list()
   })
 }
-    
-  
-  # observe({
-  #   if(input$customize_map == "yes") {
-  #     # Change cursor to paint roller
-  #     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
-  #   } else {
-  #     # Revert cursor to default
-  #     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
-  #   }
-  # })
-  
+
+
+# observe({
+#   if(input$customize_map == "yes") {
+#     # Change cursor to paint roller
+#     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
+#   } else {
+#     # Revert cursor to default
+#     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
+#   }
+# })
+
 
 
 
