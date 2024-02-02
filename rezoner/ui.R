@@ -1,6 +1,7 @@
 library(shiny)
 library(shinyjs)
 library(leaflet)
+source('./modules.R', local=T)
 
 ui <- fluidPage(
   useShinyjs(),  # Initialize shinyjs
@@ -73,6 +74,11 @@ ui <- fluidPage(
                         "Extend rezoning to anywhere that's not a PEG" = "extend_except_peg",
                         "Extend rezoning to rest of city" = "extend_errwhere",
                         "Extend rezoning to areas with high economic opportunity" = "extend_econ",
+                        "Add Parisian zoning for non-rezoned, non-PEG areas" = "extend_broockman1",
+                        "Add Parisian zoning on 2500+ sq ft lots in non-rezoned, non-PEG areas" = "extend_broockman2",
+                        "Add Parisian zoning on 5000+ sq ft lots in non-rezoned, non-PEG areas" = "extend_broockman3",
+                        "Add Parisian zoning on 5000+ sq ft, non-MFR lots in non-rezoned, non-PEG areas" = "extend_broockman4",
+                      
                         'Select an option.' = 'none'),
                     selected = 'none'),
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
@@ -92,6 +98,11 @@ ui <- fluidPage(
           condition = "input.map == 'sim'",
           actionButton("resimulateBtn", "Resimulate")
         ),
+        numericInput("stories", "Upzone to [x] stories", value = 4, min = 4, max = 15),
+        uiOutput("requirements_ui"),
+        actionButton("add_requirement", "Add another requirement"),
+        actionButton("delete_requirement", "Delete last requirement"),
+        actionButton("rezone", "Rezone!"),
         position = "bottom-left"
       ),
 

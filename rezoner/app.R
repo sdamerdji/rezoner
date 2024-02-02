@@ -9,7 +9,7 @@ library(stringr)
 library(RColorBrewer)
 library(compiler)
 library(profvis)
-
+source('./modules.R', local=T)
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
@@ -17,7 +17,6 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
-browser()
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
@@ -335,7 +334,7 @@ simulate_buildout <- function(to_plot) {
 }
 
 # Server logic
-server <- function(input, output) {
+server <- function(input, output, session) {
   updatedData <- reactiveVal(NA)
   
   # Update the reactive value whenever input features change
@@ -423,7 +422,6 @@ server <- function(input, output) {
       to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
       to_plot <- st_drop_geometry(to_plot)
       print(paste0('pre group by took: ', round(Sys.time() - start, 1)))
-      browser()
       # TODO: there is a fundamental problem I think in this code that I use
       # a group by that includes ZONING
       # I need to filter out parcels before simplify_geometries.R
@@ -599,10 +597,10 @@ server <- function(input, output) {
       head(5) %>%
       select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
     yields <- paste0('Lot ', format(values$mapblklot), 
-                  " yields ", round(values$net_units), 
-                  ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
-                  'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
-                  ' acres\n', collapse='')
+                     " yields ", round(values$net_units), 
+                     ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
+                     'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
+                     ' acres\n', collapse='')
     return(paste0('Top Lots\n', yields))
   })
   
@@ -621,10 +619,10 @@ server <- function(input, output) {
                               format="f", big.mark=",", digits=0),
                       "HOMES GO TEAM")
     sad <-paste("\nThe remaining shortfall is:",
-                         formatC(36282 - added_capacity, 
-                                 format="f", big.mark=",", digits=0),
+                formatC(36282 - added_capacity, 
+                        format="f", big.mark=",", digits=0),
                 'units.')
-
+    
     if (added_capacity > 36282) {
       result <- paste(updated_help, congrats)
       
@@ -636,7 +634,40 @@ server <- function(input, output) {
     return(result)
   })
   
+  requirements <- reactiveValues(count = 0, ids = list())
   
+  
+  observeEvent(input$add_requirement, {
+    req_id <- paste0("requirement", requirements$count + 1)
+    requirements$count <- requirements$count + 1
+    requirements$ids <- c(requirements$ids, req_id)
+    # Ensure a div wrapper or similar container for easy removal
+    insertUI(
+      selector = "#add_requirement", 
+      where = "beforeBegin", 
+      ui = div(id = req_id, requirementUI(req_id))
+    )
+    requirementServer(req_id)
+  })
+  
+  observeEvent(input$delete_requirement, {
+    if (requirements$count > 0) {
+      last_id <- requirements$ids[[requirements$count]]
+      # Correctly target the div wrapper for removal
+      removeUI(selector = paste0("#", last_id))
+      requirements$count <- requirements$count - 1
+      requirements$ids <- head(requirements$ids, -1)
+    }
+  })
+  
+  observeEvent(input$rezone, {
+    # Correctly remove each dynamically added component
+    lapply(requirements$ids, function(id) removeUI(selector = paste0("#", id)))
+    requirements$count <- 0
+    requirements$ids <- list()
+  })
+}
+    
   
   # observe({
   #   if(input$customize_map == "yes") {
@@ -648,7 +679,7 @@ server <- function(input, output) {
   #   }
   # })
   
-}
+
 
 
 shinyApp(ui = ui, server = server)
