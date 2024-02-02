@@ -17,6 +17,7 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
+browser()
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
@@ -28,6 +29,7 @@ decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
 parisian_height <- 75
 parisian <- paste0(parisian_height, "' Height Allowed")
+max_envelope <- max(df$Envelope_1000)
 
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
@@ -268,8 +270,9 @@ update_df_ <- function(scenario, extend, n_years) {
             # no downzoning allowed
             existing_sqft = Envelope_1000 / Upzone_Ratio,
             Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
+            Envelope_1000 = pmin(Envelope_1000, max_envelope, na.rm=T),
             Upzone_Ratio = Envelope_1000 / existing_sqft,
-            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850
+            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
       )
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
@@ -420,7 +423,7 @@ server <- function(input, output) {
       to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
       to_plot <- st_drop_geometry(to_plot)
       print(paste0('pre group by took: ', round(Sys.time() - start, 1)))
-      
+      browser()
       # TODO: there is a fundamental problem I think in this code that I use
       # a group by that includes ZONING
       # I need to filter out parcels before simplify_geometries.R
@@ -501,7 +504,6 @@ server <- function(input, output) {
         palette = "Blues",
         domain = c(0, 5))
       
-      #browser()
       leafletProxy("mainPlot", data = to_plot) %>%
         clearGroup('parcels') %>%
         clearGroup('dynamicMarkers') %>%
