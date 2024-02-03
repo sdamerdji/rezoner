@@ -3,12 +3,10 @@ library(dplyr)
 library(sf)
 library(leaflet)
 library(shinyjs)
-library(shinyBS)
 library(sfarrow)
 library(stringr)
 library(RColorBrewer)
 library(compiler)
-library(profvis)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
@@ -249,11 +247,10 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
   
   # USER REZONING
   for (list_item in user_rezonings) {
-      df <- mutate(df, 
-                   ZONING = ifelse(eval(parse(text=list_item$new_expr)),
-                                   list_item$new_height_description, 
-                                   ZONING))
-    
+    df <- mutate(df, 
+                 ZONING = ifelse(eval(parse(text=list_item$new_expr)),
+                                 list_item$new_height_description, 
+                                 ZONING))
   }
   # See page 30 of Appendix B in Scenario A for reasoning
   df <- df %>%
@@ -674,14 +671,38 @@ server <- function(input, output, session) {
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
     new_expr <- paste0('TRUE & (', new_height, ' > ex_height2024)')
-    #browser()
     for (prefix in requirements$ids) {
       to_add <- NULL
-      if (input[[paste0(prefix, '-parcel_filter')]] == 'PEG') {
+      parcel_filter <- input[[paste0(prefix, '-parcel_filter')]]
+      if (parcel_filter == 'PEG') {
         to_add <- 'peg'
       }
-      else if (input[[paste0(prefix, '-parcel_filter')]] == 'Already Rezoned') {
+      else if (parcel_filter == 'Already Rezoned') {
         to_add <- '!is.na(ZONING)'
+      }
+      else if (parcel_filter == 'Economic Opportunity') {
+        econ_threshold <- input[[paste0(prefix, '-economic_score')]]
+        to_add <- paste0('(econ_affh > ', as.numeric(econ_threshold) / 100, ')')
+      }
+      else if (parcel_filter == 'Transit') {
+        distance <- input[[paste0(prefix, '-distance')]]
+        to_add <- paste0('(transit_dist < ', as.numeric(distance), ')')
+      }
+      else if (parcel_filter == 'Rapid Bus Line') {
+        distance <- input[[paste0(prefix, '-distance')]]
+        to_add <- paste0('(transit_dist_rapid < ', as.numeric(distance), ')')
+      }
+      else if (parcel_filter == 'Commercial Corridor') {
+        distance <- input[[paste0(prefix, '-distance')]]
+        to_add <- paste0('(commercial_dist < ', as.numeric(distance), ')')
+      }
+      else if (parcel_filter == 'Lot Size') {
+        sqft_lot_size <- input[[paste0(prefix, '-lot_size')]]
+        to_add <- paste0('(ACRES > ', as.numeric(sqft_lot_size) / 43560, ')')
+      }
+      else if (parcel_filter == 'Neighborhood') {
+        nhood <- input[[paste0(prefix, '-hood')]]
+        to_add <- paste0('(nhood == "', nhood, '")')
       }
       if (input[[paste0(prefix, '-is_in')]] == 'not in') {
         to_add <- paste0('(!', to_add, ')')

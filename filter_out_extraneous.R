@@ -38,3 +38,17 @@ filtered <- filtered %>% select(-MapBlkLot_Master, -Developed,
 filtered <- filtered %>% select(-sup_dist_name, -EX_GP_TYPE, -EX_ZONING)
 st_write_feather(filtered, './four_rezonings_v4.feather')
 
+
+# Remove pipeline
+df <- st_read_feather('./four_rezonings_v4.feather')
+pipeline <- st_read('../SF Development Pipeline 2023 Q3_20240203.geojson')
+pipeline <- pipeline[!is.na(pipeline$proposed_units) 
+                      & (as.numeric(pipeline$proposed_units) > 0)
+                      & !(is.na(pipeline$net_pipeline_units)) 
+                      & (as.numeric(pipeline$net_pipeline_units) > 0)
+                      & !(st_is_empty(pipeline)),]
+pipeline_points <- st_union(pipeline)
+result <- st_filter(df, pipeline_points, .predicate=st_disjoint)
+nrow(result)
+st_write_feather(result, './four_rezonings_v4.feather')
+

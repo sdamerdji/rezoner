@@ -98,9 +98,14 @@ ui <- fluidPage(
           condition = "input.map == 'sim'",
           actionButton("resimulateBtn", "Resimulate")
         ),
-        numericInput("stories", "Upzone to [x] stories", value = 4, min = 4, max = 15),
+        h4('Define a custom upzoning ⤵️️'),
+        tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
+                 tags$b("Upzone to "),
+                 numericInput("stories", label = NULL, value = 4, min = 4, max = 15),
+                 tags$b(" stories.")
+        ),
         uiOutput("requirements_ui"),
-        actionButton("add_requirement", "Add another requirement"),
+        actionButton("add_requirement", "Add a requirement"),
         actionButton("delete_requirement", "Delete last requirement"),
         actionButton("rezone", "Rezone!"),
         position = "bottom-left"
