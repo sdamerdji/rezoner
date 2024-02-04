@@ -11,9 +11,9 @@ source('./modules.R', local=T)
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
-
+options(shiny.fullstacktrace=TRUE)
 max_user_rezoning_height <- 240
-df <- st_read_feather('./four_rezonings_v4.feather')
+df <- readRDS('./four_rezonings_v4.RDS')
 df['ZONING'] <- NA
 #browser()
 df <- df %>%
@@ -654,7 +654,7 @@ server <- function(input, output, session) {
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
-    new_expr <- paste0('TRUE & (!((ex_height2024 >', new_height, ') & sb330_applies))')
+    new_expr <- paste0('TRUE & !((ex_height2024 > ', new_height, ') & sb330_applies)')
     for (prefix in requirements$ids) {
       to_add <- NULL
       parcel_filter <- input[[paste0(prefix, '-parcel_filter')]]
@@ -698,7 +698,7 @@ server <- function(input, output, session) {
                                                            new_expr = new_expr)
     
     # Correctly remove each dynamically added component
-    lapply(requirements$ids, function(idd) removeUI(selector = paste0("#", id)))
+    lapply(requirements$ids, function(id) removeUI(selector = paste0("#", id)))
     requirements$count <- 0
     requirements$ids <- list()
   })
