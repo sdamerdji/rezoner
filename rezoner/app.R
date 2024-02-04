@@ -12,7 +12,7 @@ source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 options(shiny.fullstacktrace=TRUE)
-max_user_rezoning_height <- 240
+
 df <- readRDS('./four_rezonings_v4.RDS')
 df['ZONING'] <- NA
 #browser()
@@ -422,11 +422,12 @@ server <- function(input, output, session) {
           expected_units = sum(expected_units),
           expected_units_baseline = sum(expected_units_baseline),
           net_units = sum(net_units),
+          affh2023 = first(affh2023),
           ex_height2024 = first(ex_height2024),
           sb330_applies = first(sb330_applies),
           .groups='keep')
-      
-      to_plot <- st_sf(left_join(to_plot, geometries, 
+
+      to_plot <- st_sf(left_join(to_plot, geometries,
                                  by=c('block', 'M1_ZONING', 'M2_ZONING',
                                       'M3_ZONING', 'M4_ZONING')))
       # TODO: Fix this in simplify_geometries.R
@@ -457,6 +458,7 @@ server <- function(input, output, session) {
             ZONING,
             '<br>Existing height:', ex_height2024, 
             '<br>Block:', block,
+            '<br>TCAC:', affh2023,
             "<br>Expected Units:",
             formatC(round(net_units, 1),
                     format='f', big.mark=',', digits=1),
@@ -668,13 +670,41 @@ server <- function(input, output, session) {
         econ_threshold <- input[[paste0(prefix, '-economic_score')]]
         to_add <- paste0('(econ_affh > ', as.numeric(econ_threshold) / 100, ')')
       }
+      else if (parcel_filter == 'TCAC') {
+        threshold <- input[[paste0(prefix, '-affh_score')]]
+        in_expr <- ''
+        if (threshold == 'Low') {
+          in_expr = "c('Low Resource', 'Moderate Resource', 'High Resource', 'Highest Resource')"
+        } else if (threshold == 'Medium') {
+          in_expr = "c('Moderate Resource', 'High Resource', 'Highest Resource')"
+        } else if (threshold == 'High') {
+          in_expr = "c('High Resource', 'Highest Resource')"
+        }
+        to_add <- paste0('(!is.na(affh2023) & affh2023 %in% ', in_expr, ')')
+      }
       else if (parcel_filter == 'Transit') {
-        distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(transit_dist < ', as.numeric(distance), ')')
+        distance <- as.numeric(input[[paste0(prefix, '-distance')]])
+        relevant_transit <- input[[paste0(prefix, '-transit_options')]]
+        conditions <- c()
+        if('Caltrain Stops' %in% relevant_transit) {
+          conditions <- c(conditions, paste0('(transit_dist_caltrain < ', distance, ')'))
+        }
+        
+        if('BART Stops' %in% relevant_transit) {
+          conditions <- c(conditions, paste0('(transit_dist_bart < ', distance, ')'))
+        }
+        
+        if('Rapid Bus Line' %in% relevant_transit) {
+          conditions <- c(conditions, paste0('(transit_dist_rapid < ', distance, ')'))
+        }
+        if('Bus Lines (<10 min headways)' %in% relevant_transit) {
+          conditions <- c(conditions, paste0('(transit_dist < ', distance, ')'))
+        }
+        to_add <- paste(conditions, collapse = ' | ')
       }
       else if (parcel_filter == 'Rapid Bus Line') {
         distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(transit_dist_rapid < ', as.numeric(distance), ')')
+        to_add <- paste0('(transit_dist_rapid < ', distance, ')')
       }
       else if (parcel_filter == 'Commercial Corridor') {
         distance <- input[[paste0(prefix, '-distance')]]
