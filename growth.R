@@ -124,3 +124,50 @@ results2[, 'lat'] <- points[,2]
 
 
 st_write_feather(results2, '../four_rezonings_v3.feather')
+
+
+###### MUNI LINES ######
+setwd('~/Desktop/rezoner2/rezoner')
+df <- st_read_feather('./four_rezonings_v4.feather')
+muni <- st_read('../Muni Simple Routes_20240202.geojson')
+frequent_lines <- muni[(muni$service_ca == '10 Minutes or Less'),]
+nearest = st_nearest_feature(df, frequent_lines)
+dist = st_distance(df, frequent_lines[nearest,], by_element=TRUE)
+df['transit_dist'] <- as.numeric(dist / 1609)
+st_write_feather(df, './four_rezonings_v4.feather')
+
+# Now just rapid muni lines
+rapid_lines <- muni[str_detect(muni$lineabbr, 'R$'),]
+nearest = st_nearest_feature(df, rapid_lines)
+dist = st_distance(df, rapid_lines[nearest,], by_element=TRUE)
+df['transit_dist_rapid'] <- as.numeric(dist / 1609)
+st_write_feather(df, './four_rezonings_v4.feather')
+
+
+###### COMMERCIAL CORRIDORS ###### 
+setwd('~/Desktop/rezoner2/rezoner')
+df <- st_read_feather('./four_rezonings_v4.feather')
+sf_use_s2(F)
+zoning <- st_read('../Zoning Map - Zoning Districts.geojson')
+commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),] #TODO: Ask Annie if correct
+
+nearest = st_nearest_feature(df, commercial_corridors)
+dist = st_distance(df, commercial_corridors[nearest,], by_element=TRUE)
+df['commercial_dist'] <- as.numeric(dist / 1609)
+st_write_feather(df, './four_rezonings_v4.feather')
+
+####### NEIGHBORHOODS ####### 
+setwd('~/Desktop/rezoner2/rezoner')
+df <- st_read_feather('./four_rezonings_v4.feather')
+sf_use_s2(F)
+hoods <- st_read('../Analysis Neighborhoods_20240202.geojson')
+saveRDS(sort(hoods$nhood), './hoods.RDS')
+
+result <- st_join(df, hoods, largest=T)
+st_write_feather(result, './four_rezonings_v4.feather')
+
+#### TRY RDS INSTEAD OF FEATHER. IT TAKES A THIRD OF THE TIME. ####
+df <- st_read_feather('./four_rezonings_v4.feather')
+saveRDS(df, './four_rezonings_v4.RDS')
+
+nrow(hoods)
