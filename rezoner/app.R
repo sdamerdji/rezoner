@@ -15,6 +15,7 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
+#browser()
 df <- df %>%
   mutate(sb330_applies = case_when(
     # If all are false, then it's R1, so SB 330 applies
@@ -23,7 +24,6 @@ df <- df %>%
     zp_DensRestMulti == 1 | zp_FormBasedMulti == 1 | zp_RH3_RM1 == 1 | zp_RH2 == 1 | zp_Redev == 1 ~ 1,
     TRUE ~ 0
   ))
-browser()
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
@@ -92,7 +92,7 @@ height_setter <- function(ZONING, height) {
 
 
 upzone <- function(df) {
-  sum(pmax(df$expected_units - df$expected_units_baseline, 0, na.rm = T))
+  sum(pmax(df$expected_units - df$expected_units_baseline, 0))
 }
 
 update_df_ <- function(scenario, extend, n_years, user_rezonings) {
@@ -253,12 +253,13 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
              TRUE ~ NA_real_
            ),
            # no downzoning allowed
-           existing_sqft = Envelope_1000 / Upzone_Ratio,
-           Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000, na.rm = TRUE),
-           Envelope_1000 = pmin(Envelope_1000, max_envelope, na.rm=T),
-           Upzone_Ratio = Envelope_1000 / existing_sqft,
+           existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
+           Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
+           Envelope_1000 = pmin(Envelope_1000, max_envelope),
+           Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
     )
+  #browser()
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
@@ -284,7 +285,7 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
       expected_units = pdev * expected_units_if_dev,
       expected_units_baseline = pdev_baseline * expected_units_baseline_if_dev,
       expected_units_skyscraper = pdev_skyscraper * expected_units_skyscraper_if_dev,
-      net_units = pmax(expected_units - expected_units_baseline, 0, na.rm=T)
+      net_units = pmax(expected_units - expected_units_baseline, 0)
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
@@ -454,7 +455,7 @@ server <- function(input, output, session) {
           popup = ~ paste(
             "New Zoning:",
             ZONING,
-            '<br>Existing height': ex_height2024, 
+            '<br>Existing height:', ex_height2024, 
             '<br>Block:', block,
             "<br>Expected Units:",
             formatC(round(net_units, 1),
@@ -572,7 +573,7 @@ server <- function(input, output, session) {
   output$supervisors <- renderText({
     values <- st_drop_geometry(updatedData()) %>% 
       group_by(sup_name) %>%
-      summarise(units = sum(net_units, na.rm=T)) %>%
+      summarise(units = sum(net_units)) %>%
       arrange(desc(units))
     allocations <- paste0(format(values$sup_name, width=15), "\t", round(values$units), " units")
     allocations_string <- paste(allocations, collapse="\n")
@@ -653,7 +654,7 @@ server <- function(input, output, session) {
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
-    new_expr <- paste0('TRUE & !((', new_height, ' <= ex_height2024) & sb330_applies)')
+    new_expr <- paste0('TRUE & (!((ex_height2024 >', new_height, ') & sb330_applies))')
     for (prefix in requirements$ids) {
       to_add <- NULL
       parcel_filter <- input[[paste0(prefix, '-parcel_filter')]]
