@@ -13,7 +13,7 @@ ui <- fluidPage(
       tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
     ),
     titlePanel(
-      "Upzone the City"
+      h1("Upzone the City")
     ),
     sidebarLayout(
       sidebarPanel(
@@ -101,13 +101,68 @@ ui <- fluidPage(
         h4('Define a custom upzoning ⤵️️'),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
                  tags$b("Upzone to "),
-                 numericInput("stories", label = NULL, value = 4, min = 4, max = 15),
+                 numericInput("stories", label = NULL, value = 10, min = 4, max = 25),
                  tags$b(" stories.")
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Add a requirement"),
         actionButton("delete_requirement", "Delete last requirement"),
-        actionButton("rezone", "Rezone!"),
+        tags$head(
+          tags$style(HTML("
+            #rezone {
+                border: none;
+                outline: none;
+                color: #fff;
+                background: #111;
+                cursor: pointer;
+                position: relative;
+                z-index: 0;
+                border-radius: 10px;
+            }
+            #rezone:before {
+                content: '';
+                background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+                position: absolute;
+                top: -2px;
+                left: -2px;
+                background-size: 400%;
+                z-index: -1;
+                filter: blur(5px);
+                width: calc(100% + 4px);
+                height: calc(100% + 4px);
+                animation: glowing 20s linear infinite;
+                opacity: 0;
+                transition: opacity .3s ease-in-out;
+                border-radius: 10px;
+            }
+            #rezone:active {
+                color: #000;
+            }
+            #rezone:active:after {
+                background: transparent;
+            }
+            #rezone:hover:before {
+                opacity: 1;
+            }
+            #rezone:after {
+                z-index: -1;
+                content: '';
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                background: #111;
+                left: 0;
+                top: 0;
+                border-radius: 10px;
+            }
+            @keyframes glowing {
+                0% { background-position: 0 0; }
+                50% { background-position: 400% 0; }
+                100% { background-position: 0 0; }
+            }
+            "))
+        ),
+        actionButton("rezone", "Rezone!", class = "glow-on-hover"),
         position = "bottom-left"
       ),
 
