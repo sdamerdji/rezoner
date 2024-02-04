@@ -15,6 +15,15 @@ pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 max_user_rezoning_height <- 240
 df <- st_read_feather('./four_rezonings_v4.feather')
 df['ZONING'] <- NA
+df <- df %>%
+  mutate(sb330_applies = case_when(
+    # If all are false, then it's R1, so SB 330 applies
+    (zp_OfficeComm + zp_DensRestMulti + zp_FormBasedMulti + zp_PDRInd + zp_Public + zp_Redev + zp_RH2 + zp_RH3_RM1) == 0 ~ 1,
+    # If any of the other residential zones are 1, then SB 330 applies.
+    zp_DensRestMulti == 1 | zp_FormBasedMulti == 1 | zp_RH3_RM1 == 1 | zp_RH2 == 1 | zp_Redev == 1 ~ 1,
+    TRUE ~ 0
+  ))
+browser()
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
@@ -92,6 +101,7 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
   # Return df with fields "Expected" and "Pdev"
   # if extend affh, then where high opp but not already upzoned, upzone to either floor (fourplex) or height + 20
   print(scenario)
+  # TODO: Check that df$zp_ vars are the same each iteration even tho overwritten
   start <- Sys.time()
   if (scenario == 'A') {
     df['ZONING'] <- df$M1_ZONING
@@ -118,118 +128,87 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
     df['ZONING'] <- df$M5_ZONING
     df <- paris(df)
   }
-  boost <- 20
   if (extend == 'extend_affh') {
     # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
     is_fourplex_floor <- fourplex %in% df$ZONING
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) 
-                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
                              fourplex,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg)
-                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
     
     # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
-                               !(is_fourplex_floor) & (ex_height2024 <= parisian_height),
+                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
                              parisian,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
-                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
-                             ZONING))
+                             ZONING)) 
   }
   if (extend == 'extend_econ') {
     #TODO: I feel like !is.na(econ_affh) should not work
     is_fourplex_floor <- fourplex %in% df$ZONING
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 ) 
-                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
                              fourplex,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 )  
-                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
-                             ZONING))
+                             ZONING)) 
     
     # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) &
-                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
                              parisian,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) & 
-                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
-                             ZONING))
+                             ZONING)) 
   }
   if (extend ==  'extend_except_peg') {
     is_fourplex_floor <- fourplex %in% df$ZONING
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING)  & (!is.na(peg)) & (!peg)
-                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
                              fourplex,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
-                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
-                             ZONING))
+                             ZONING)) 
     
     # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & (!is.na(peg)) & (!peg) & 
-                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
                              parisian,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
-                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
   }
   if (extend == 'extend_errwhere') {
     is_fourplex_floor <- fourplex %in% df$ZONING
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING)  
-                             & is_fourplex_floor & (ex_height2024 <= 40),
+                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
                              fourplex,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & (!peg)
-                             & is_fourplex_floor & (ex_height2024 > 40) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
-                             ZONING))
+                             ZONING)) 
     
     # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) &
-                               !(is_fourplex_floor) & ex_height2024 <= parisian_height,
+                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
                              parisian,
-                             ZONING)) %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & (!peg) &
-                               !(is_fourplex_floor) & (ex_height2024 > parisian_height) & (ex_height2024 < max_user_rezoning_height - boost),
-                             paste0(ex_height2024 + boost, "' Height Allowed"),
                              ZONING))
   }
   if (extend == 'extend_broockman1') {
     df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) & ex_height2024 <= parisian_height,
+      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
+                               !((ex_height2024 > parisian_height) & sb330_applies),
                              parisian,
                              ZONING))
   }
   if (extend == 'extend_broockman2') {
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               (ex_height2024 <= parisian_height) & (ACRES >= 0.0573921),
+                               !((ex_height2024 > parisian_height) & sb330_applies) & (ACRES >= 0.0573921),
                              parisian,
                              ZONING))
   }
   if (extend == 'extend_broockman3') {
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               (ex_height2024 <= parisian_height) & (ACRES >= 0.1147842),
+                               !((ex_height2024 > parisian_height) & sb330_applies) 
+                             & (ACRES >= 0.1147842),
                              parisian,
                              ZONING))
   }
@@ -237,7 +216,8 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
     df <- df %>%
       mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
                                (!zp_DensRestMulti & !zp_FormBasedMulti) &
-                               (ex_height2024 <= parisian_height) & (ACRES >= 0.1147842),
+                               !((ex_height2024 > parisian_height) & sb330_applies)
+                             & (ACRES >= 0.1147842),
                              parisian,
                              ZONING))
   }
@@ -441,6 +421,8 @@ server <- function(input, output, session) {
           expected_units = sum(expected_units),
           expected_units_baseline = sum(expected_units_baseline),
           net_units = sum(net_units),
+          ex_height2024 = first(ex_height2024),
+          sb330_applies = first(sb330_applies),
           .groups='keep')
       
       to_plot <- st_sf(left_join(to_plot, geometries, 
@@ -472,6 +454,7 @@ server <- function(input, output, session) {
           popup = ~ paste(
             "New Zoning:",
             ZONING,
+            '<br>Existing height': ex_height2024, 
             '<br>Block:', block,
             "<br>Expected Units:",
             formatC(round(net_units, 1),
@@ -670,7 +653,7 @@ server <- function(input, output, session) {
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
-    new_expr <- paste0('TRUE & (', new_height, ' > ex_height2024)')
+    new_expr <- paste0('TRUE & !((', new_height, ' <= ex_height2024) & sb330_applies)')
     for (prefix in requirements$ids) {
       to_add <- NULL
       parcel_filter <- input[[paste0(prefix, '-parcel_filter')]]
@@ -714,7 +697,7 @@ server <- function(input, output, session) {
                                                            new_expr = new_expr)
     
     # Correctly remove each dynamically added component
-    lapply(requirements$ids, function(id) removeUI(selector = paste0("#", id)))
+    lapply(requirements$ids, function(idd) removeUI(selector = paste0("#", id)))
     requirements$count <- 0
     requirements$ids <- list()
   })
