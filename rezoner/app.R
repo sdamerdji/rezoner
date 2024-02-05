@@ -510,7 +510,7 @@ server <- function(input, output, session) {
                      "New Zoning:",
                      ZONING,
                      '<br>APN:', mapblklot,
-                     '<br>Missing Potential per Acre:', round(10**(missing_potential - 1), 1),
+                     '<br>Missing Potential per Acre:', round((10**missing_potential) - 1, 1),
                      "<br>Expected Units:",
                      formatC(round(expected_units, 1),
                              format='f', big.mark=',', digits=1),
