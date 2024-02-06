@@ -74,12 +74,12 @@ union_of_maxdens <- function(df) {
 }
 
 
-height_setter <- function(ZONING, height) {
+height_setter <- function(ZONING, new_height, old_height) {
   dplyr::case_when(
     ZONING == fourplex ~ 40,
     ZONING == decontrol ~ 40,
-    !is.na(ZONING) & is.na(height) ~ 40,
-    .default = height
+    is.na(new_height) ~ old_height,
+    .default = new_height
   )
 }
 
@@ -238,7 +238,7 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
                                        0),
            zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0),
            height = as.numeric(str_extract(ZONING, "\\d+")),
-           height = height_setter(ZONING, height),
+           height = height_setter(ZONING, height, ex_height2024),
            Envelope_1000_new = case_when(
              height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
              ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
@@ -252,7 +252,7 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
            Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
            expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
     )
-  #browser()
+  browser()
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
