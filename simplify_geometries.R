@@ -6,7 +6,6 @@ library(shiny)
 library(dplyr)
 library(sf)
 library(leaflet)
-library(waiter)
 library(shinyjs)
 library(sfarrow)
 
@@ -45,3 +44,10 @@ result <- left_join(df, no_geo_bs,
 result <- select(result, -block)
 st_write_feather(result, './four_rezonings_v2.feather')
 getwd()
+
+
+#### Try simplifying just the RDS File ####
+setwd('./rezoner')
+df <- readRDS('./four_rezonings_v4.RDS')
+df_simple <- rmapshaper::ms_simplify(df, keep=.25)
+saveRDS(df_simple, './four_rezonings_v4s.RDS')
