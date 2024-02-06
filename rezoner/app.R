@@ -13,17 +13,10 @@ model <- readRDS(file='./light_model.rds')
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 options(shiny.fullstacktrace=TRUE)
 
-df <- readRDS('./four_rezonings_v4.RDS')
-df['ZONING'] <- NA
-#browser()
-df <- df %>%
-  mutate(sb330_applies = case_when(
-    # If all are false, then it's R1, so SB 330 applies
-    (zp_OfficeComm + zp_DensRestMulti + zp_FormBasedMulti + zp_PDRInd + zp_Public + zp_Redev + zp_RH2 + zp_RH3_RM1) == 0 ~ 1,
-    # If any of the other residential zones are 1, then SB 330 applies.
-    zp_DensRestMulti == 1 | zp_FormBasedMulti == 1 | zp_RH3_RM1 == 1 | zp_RH2 == 1 | zp_Redev == 1 ~ 1,
-    TRUE ~ 0
-  ))
+#df <- st_read_feather('./four_rezonings_v5.feather')
+df <- readRDS('./four_rezonings_v5.RDS')
+
+
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
