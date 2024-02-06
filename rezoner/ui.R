@@ -13,7 +13,7 @@ ui <- fluidPage(
       tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
     ),
     titlePanel(
-      h1("Upzone the City")
+      "Upzone the City"
     ),
     sidebarLayout(
       sidebarPanel(
