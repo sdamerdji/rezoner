@@ -16,7 +16,6 @@ options(shiny.fullstacktrace=TRUE)
 #df <- st_read_feather('./four_rezonings_v5.feather')
 df <- readRDS('./four_rezonings_v5.RDS')
 
-
 geometries <- st_read_feather('./simple_geometries.feather')
 info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
                        "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
@@ -28,7 +27,6 @@ decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
 parisian_height <- 75
 parisian <- paste0(parisian_height, "' Height Allowed")
-max_envelope <- max(df$Envelope_1000)
 
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
@@ -76,10 +74,10 @@ union_of_maxdens <- function(df) {
 
 height_setter <- function(ZONING, new_height, old_height) {
   dplyr::case_when(
-    ZONING == fourplex ~ 40,
-    ZONING == decontrol ~ 40,
-    is.na(new_height) ~ old_height,
-    .default = new_height
+    ZONING == fourplex ~ pmax(old_height, 40),
+    ZONING == decontrol ~ pmax(old_height, 40),
+    !is.na(ZONING) & !is.na(new_height) ~ new_height,
+    .default = old_height
   )
 }
 
@@ -226,6 +224,9 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
                                  ZONING))
   }
   # See page 30 of Appendix B in Scenario A for reasoning
+  building_efficiency_discount <- .8
+  typical_unit_size <- 850
+
   df <- df %>%
     mutate(zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
            zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
@@ -239,21 +240,32 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
            zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0),
            height = as.numeric(str_extract(ZONING, "\\d+")),
            height = height_setter(ZONING, height, ex_height2024),
-           Envelope_1000_new = case_when(
-             height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
-             ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
-             ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
-             TRUE ~ NA_real_
+           height_deduction = if_else(height <= 50, 10, 15), #TODO: unselect
+           n_floors_residential = (height - height_deduction) %/% 10, #TODO: unselect
+           #n_floors_residential = height / 10.5, # David's code
+           lot_coverage_discount = if_else(ACRES > 1, .55, .75), #TODO: unselect
+           lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
+           #lot_coverage_discount = if_else(height > 85, .8, lot_coverage_discount), # David's code
+           ground_floor = (ACRES * 43560) * lot_coverage_discount,
+           Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000,
+           n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
+                                          pmin(n_floors_residential, 12), 
+                                          n_floors_residential),
+           expected_built_envelope = case_when(
+             height <= 85 ~ ground_floor * n_floors_residential,
+             height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
+             height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
+             TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
            ),
+           expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
            # no downzoning allowed
            existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
            Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
-           Envelope_1000 = pmin(Envelope_1000, max_envelope),
            Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-           expected_units_if_dev = Envelope_1000 * 1000 * 0.8 / 850 # Should 0.8 this be here?
+           expected_units_if_dev = if_else(ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
     )
-  browser()
-  
+
+    
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
     df <- df %>%
