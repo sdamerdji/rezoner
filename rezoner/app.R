@@ -211,7 +211,7 @@ generate_plot <- function() {
   leaflet(df) %>%
     addProviderTiles(providers$CartoDB.Positron, 
                      options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
-    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)  
+    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)
 }
 
 calculate_shortfall <- function(df) {

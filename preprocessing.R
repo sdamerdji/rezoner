@@ -159,6 +159,6 @@ result <- st_join(df, hoods, largest=T)
 
 
 #### TRY RDS INSTEAD OF FEATHER. IT TAKES A THIRD OF THE TIME. ####
-saveRDS(df, './four_rezonings_v4.RDS')
+saveRDS(result, './four_rezonings_v4.RDS')
 print(paste('All', Sys.time() - start))
 

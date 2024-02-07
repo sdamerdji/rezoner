@@ -49,5 +49,12 @@ pipeline <- pipeline[!is.na(pipeline$proposed_units)
 pipeline_points <- st_union(pipeline)
 result <- st_filter(filtered, pipeline_points, .predicate=st_disjoint)
 nrow(result)
-st_write_feather(result, './four_rezonings_v5.feather')
 
+fourplex <- 'Increased density up to four units (six units on corner lots)'
+result[!is.na(result$M1_ZONING) & (result$M1_ZONING == fourplex) & result$ex_height2024 > 65, 'M1_ZONING'] <- NA
+result[!is.na(result$M2_ZONING) & (result$M2_ZONING == fourplex) & result$ex_height2024 > 65, 'M2_ZONING'] <- NA
+result[!is.na(result$M3_ZONING) & (result$M3_ZONING == fourplex) & result$ex_height2024 > 65, 'M3_ZONING'] <- NA
+result[!is.na(result$M4_ZONING) & (result$M4_ZONING == fourplex) & result$ex_height2024 > 65, 'M4_ZONING'] <- NA
+result[!is.na(result$M5_ZONING) & (result$M5_ZONING == fourplex) & result$ex_height2024 > 65, 'M5_ZONING'] <- NA
+st_write_feather(result, './four_rezonings_v5.feather')
+saveRDS(result, './four_rezonings_v5.RDS')
