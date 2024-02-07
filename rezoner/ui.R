@@ -18,8 +18,8 @@ ui <- fluidPage(
     sidebarLayout(
       sidebarPanel(
         selectInput("scenario", "Upzoning Strategies:",
-                    choices = c("Current SF Planning Proposal for Housing Element Rezoning" = "E",
-                      "Fall 2023 SF Planning Proposal for Housing Element Rezoning" = "D",
+                    choices = c("Current SF Planning Proposal" = "E",
+                                "Fall 2023 SF Planning Proposal" = "D",
                                 "Housing Element Rezoning Scenario A" = "A",
                                 "Housing Element Rezoning Scenario B" = "B",
                                 "Housing Element Rezoning Scenario C" = "C",
