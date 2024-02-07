@@ -40,6 +40,11 @@ ui <- fluidPage(
         ),
 
         h4('Define a custom upzoning:'),
+        tags$style(HTML("
+          input#stories {
+            background-color: #f7f7f7;
+          }
+        ")),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
                  HTML("Upzone to&nbsp;"),
                  numericInput("stories", label = NULL, value = 10, min = 4, max = 25),
@@ -47,7 +52,8 @@ ui <- fluidPage(
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Specify where"),
-        actionButton("delete_requirement", "Remove last", style = "background-color: #D8D8D8;"),
+
+        actionButton("delete_requirement", "Remove last"),
         tags$head(
           tags$style(HTML("
             #rezone {
@@ -103,9 +109,14 @@ ui <- fluidPage(
             }
             "))
         ),
+        tags$style(HTML("
+          input#years_slider {
+            background-color: #f7f7f7;
+          }
+        ")),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
         HTML('<br></br>'),
-        tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
+        tags$div(style = "display: flex; align-items: center; ", # Ensure alignment of text and input box
                  HTML("Project over&nbsp;"),
                  numericInput("years_slider", label = NULL, value = 5, min = 5, max = 10, width = '60px'),
                  HTML("&nbsp;years.")

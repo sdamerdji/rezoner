@@ -1,18 +1,41 @@
 library(shiny)
+library(shinyWidgets)
 
 requirementUI <- function(id) {
   ns <- NS(id)
   tagList(
-    selectInput(ns("is_in"), NULL, choices = c("in", "not in"), selected = "in"),
-    selectInput(ns("parcel_filter"), NULL, choices = c("Transit",
+    fluidRow(
+      tags$style(HTML("
+      .bootstrap-switch-label {
+        height: 20px; /* Adjust the height as needed */
+        line-height: 20px; /* Align text vertically */
+        width: 161px;
+      }
+    ")),
+      tags$style(HTML("
+  #requirement1 > div.row > div.col-sm-4 > div > div > div {
+    height: 35px; /* Adjust the height as needed */
+    line-height: 35px; /* Align text vertically */
+    width: 1070px;
+  }
+")),
+      
+      column(4,div(class = "choose.isin", 
+                   switchInput(ns("is_in"),
+                               NULL, 
+                               onLabel = "in", offLabel = "not in", 
+                               value = TRUE, size='mini'))),
+    column(8, selectInput(ns("parcel_filter"), NULL, choices = c("Transit",
                                                        "Commercial Corridor", 
                                                        "Economic Opportunity", 
                                                        "PEG",
                                                        'TCAC',
                                                        "Already Rezoned",
                                                        "Neighborhood",
-                                                       'Lot Size')),
+                                                       'Lot Size')))
+    ),
     uiOutput(ns("dynamic_slider")) # Placeholder for dynamic slider UI
+    
   )
 }
 
