@@ -17,7 +17,7 @@ ui <- fluidPage(
     ),
     sidebarLayout(
       sidebarPanel(
-        HTML('<b>Upzoning strategies:</b>'),
+        h4('Upzoning strategies:'),
         selectInput("scenario", NULL,
                     choices = c("Current SF Planning Proposal" = "E",
                                 "Fall 2023 SF Planning Proposal" = "D",
@@ -38,7 +38,7 @@ ui <- fluidPage(
           "))
         ),
 
-        HTML('<b>Define a custom upzoning️: </b>'),
+        h4('Define a custom upzoning:'),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
                  HTML("Upzone to&nbsp;"),
                  numericInput("stories", label = NULL, value = 10, min = 4, max = 25),
@@ -103,14 +103,13 @@ ui <- fluidPage(
             "))
         ),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
-        HTML('<br></br> Project housing production over the next number of years:'),
-        sliderInput("years_slider", 
-                    NULL, 
-                    min = 5, 
-                    max = 10, 
-                    value = 5,
-                    step = 1),
-        HTML("<b>Overlays:</b>"),
+        HTML('<br></br>'),
+        tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
+                 HTML("Project over&nbsp;"),
+                 numericInput("years_slider", label = NULL, value = 5, min = 5, max = 10, width = '60px'),
+                 HTML("&nbsp;years.")
+        ),
+        h4("Overlays:"),
         
         checkboxInput(
           "affh",
@@ -132,7 +131,8 @@ ui <- fluidPage(
                                           HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> SF cannot legally upzone the PEG for the housing element rezoning. Note that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
                                           )
                                         ))),
-        selectInput("map", "Map this", 
+        h4('Map this'),
+        selectInput("map", NULL, 
                     choices = c("Allowed Heights" = 'heights', 
                                 "Missing Potential Yield" = 'potential', 
                                 "E[Units]" = 'E[u]', 
