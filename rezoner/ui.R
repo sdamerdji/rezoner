@@ -5,6 +5,7 @@ source('./modules.R', local=T)
 
 ui <- fluidPage(
   useShinyjs(),  # Initialize shinyjs
+
   id = "main_content",
   tags$head(
     tags$script(src = "./js-confetti.browser.js"),
@@ -46,7 +47,7 @@ ui <- fluidPage(
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Specify where"),
-        actionButton("delete_requirement", "Remove last"),
+        actionButton("delete_requirement", "Remove last", style = "background-color: #D8D8D8;"),
         tags$head(
           tags$style(HTML("
             #rezone {
@@ -149,7 +150,7 @@ ui <- fluidPage(
         leafletOutput("mainPlot", height = "600px"),
         span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
-        span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
+        #span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
         height = "600px"
       )
