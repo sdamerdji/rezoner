@@ -86,7 +86,7 @@ upzone <- function(df) {
   sum(pmax(df$expected_units - df$expected_units_baseline, 0))
 }
 
-update_df_ <- function(scenario, extend, n_years, user_rezonings) {
+update_df_ <- function(scenario, n_years, user_rezonings) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
@@ -119,99 +119,7 @@ update_df_ <- function(scenario, extend, n_years, user_rezonings) {
     df['ZONING'] <- df$M5_ZONING
     df <- paris(df)
   }
-  if (extend == 'extend_affh') {
-    # If fourplex zoning is the floor, then rezone low density parcels to fourplex zoning
-    is_fourplex_floor <- fourplex %in% df$ZONING
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) 
-                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
-                             fourplex,
-                             ZONING))
-    
-    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & high_opportunity & (!is.na(peg)) & (!peg) &
-                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
-                             parisian,
-                             ZONING)) 
-  }
-  if (extend == 'extend_econ') {
-    #TODO: I feel like !is.na(econ_affh) should not work
-    is_fourplex_floor <- fourplex %in% df$ZONING
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9 ) 
-                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
-                             fourplex,
-                             ZONING)) 
-    
-    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(econ_affh) & (!is.na(peg)) & (!peg) & (econ_affh > .9) &
-                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
-                             parisian,
-                             ZONING)) 
-  }
-  if (extend ==  'extend_except_peg') {
-    is_fourplex_floor <- fourplex %in% df$ZONING
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING)  & (!is.na(peg)) & (!peg)
-                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
-                             fourplex,
-                             ZONING)) 
-    
-    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & (!is.na(peg)) & (!peg) & 
-                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
-                             parisian,
-                             ZONING))
-  }
-  if (extend == 'extend_errwhere') {
-    is_fourplex_floor <- fourplex %in% df$ZONING
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING)  
-                             & is_fourplex_floor & !((ex_height2024 > 40) & sb330_applies),
-                             fourplex,
-                             ZONING)) 
-    
-    # If parisian zoning is the floor, then rezone low density parcels to parisian zoning
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) &
-                               !(is_fourplex_floor) & !((ex_height2024 > parisian_height) & sb330_applies),
-                             parisian,
-                             ZONING))
-  }
-  if (extend == 'extend_broockman1') {
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               !((ex_height2024 > parisian_height) & sb330_applies),
-                             parisian,
-                             ZONING))
-  }
-  if (extend == 'extend_broockman2') {
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               !((ex_height2024 > parisian_height) & sb330_applies) & (ACRES >= 0.0573921),
-                             parisian,
-                             ZONING))
-  }
-  if (extend == 'extend_broockman3') {
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               !((ex_height2024 > parisian_height) & sb330_applies) 
-                             & (ACRES >= 0.1147842),
-                             parisian,
-                             ZONING))
-  }
-  if (extend == 'extend_broockman4') {
-    df <- df %>%
-      mutate(ZONING = ifelse(is.na(ZONING) & !is.na(peg) & !(peg) &
-                               (!zp_DensRestMulti & !zp_FormBasedMulti) &
-                               !((ex_height2024 > parisian_height) & sb330_applies)
-                             & (ACRES >= 0.1147842),
-                             parisian,
-                             ZONING))
-  }
+  
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
   #browser()
@@ -331,27 +239,14 @@ server <- function(input, output, session) {
   user_rezoning <- reactiveValues(lists=list())
   
   # Update the reactive value whenever input features change
-  observeEvent(c(input$scenario, input$extend, input$years_slider, user_rezoning$lists), {
-    updatedData(update_df(input$scenario, input$extend, input$years_slider, user_rezoning$lists))
+  observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists), {
+    updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists))
   })
   
   output$mainPlot <- renderLeaflet({
     generate_plot()
   })
-  
-  observe({
-    overlay <- input$lldl
-    multipolygon <- readRDS('./growth.RDS')
-    if (overlay) {
-      # Add the multipolygon layer when overlay is TRUE
-      leafletProxy("mainPlot") %>%
-        addPolygons(data = multipolygon, fill = NA, group="lldl", weight=.5)
-      
-    } else {
-      leafletProxy("mainPlot") %>%
-        clearGroup("lldl")
-    }
-  })
+
   observe({
     overlay <- input$peg
     multipolygon <- readRDS('./peg.RDS')

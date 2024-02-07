@@ -17,96 +17,36 @@ ui <- fluidPage(
     ),
     sidebarLayout(
       sidebarPanel(
-        selectInput("scenario", "Upzoning Strategies:",
+        HTML('<b>Upzoning strategies:</b>'),
+        selectInput("scenario", NULL,
                     choices = c("Current SF Planning Proposal" = "E",
                                 "Fall 2023 SF Planning Proposal" = "D",
-                                "Housing Element Rezoning Scenario A" = "A",
-                                "Housing Element Rezoning Scenario B" = "B",
-                                "Housing Element Rezoning Scenario C" = "C",
-                                "Take the boldest elements of scenarios A, B, C, and the current proposal" = "Union", 
+                                "Housing Element Rezoning A" = "A",
+                                "Housing Element Rezoning B" = "B",
+                                "Housing Element Rezoning C" = "C",
+                                "Take the boldest elements of A, B, C, Fall, & current proposal" = "Union", 
                                 "Parisian zoning in low density neighborhoods" = "Parisian"),
                     selected = 'E'),
-        # radioButtons("customize_map", "Customize this rezoning:",
-        #              choices = c("No" = "no", "Yes" = "yes"),
-        #              selected = "no"),
-        # conditionalPanel(
-        #   condition = "input.customize_map == 'yes'",
-        #   radioButtons("stories", "Select number of stories:",
-        #                choices = c("5 stories", "8 stories", "12 stories", "20 stories"),
-        #                selected = NULL),
-        #   actionButton("reset_map", "Reset", icon = icon("sync"))
-        # ),
-        HTML("<b>Overlay options:</b>"),
-        checkboxInput(
-          "lldl",
-          label = list(
-            "Overlay large, low density lots (outside low opportunity tract)",
-            span(
-              id = "lldl_info",
-              class = "info-icon",
-              HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a href=\'http://www.sfyimby.org\' target=\'blank\' >click me, Ill try not to disappear</a>">&#9432;</span>')
-            )
-          )
-        ),
-        
-        checkboxInput(
-          "affh",
-          label = list(
-            "Overlay high opportunity tracts",
-            span(
-              id = "affh_info",
-              class = "info-icon",
-              HTML(
-                '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by Draft 2024 TCAC Map.</a>">&#9432;</span>'
-              )
-            )
-          )),
-        
-        checkboxInput("peg", label=list("Overlay priority equity geographies",
-                                        span(
-                                          id = "peg_info",
-                                          class = "info-icon",
-                                          HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> Now that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
-                                          )
-                                        ))),
-        selectInput('extend', 'Extend rezoning:', choices = 
-                      c("Extend rezoning to high opportunity areas" = "extend_affh",
-                        "Extend rezoning to anywhere that's not a PEG" = "extend_except_peg",
-                        "Extend rezoning to rest of city" = "extend_errwhere",
-                        "Extend rezoning to areas with high economic opportunity" = "extend_econ",
-                        "Add Parisian zoning for non-rezoned, non-PEG areas" = "extend_broockman1",
-                        "Add Parisian zoning on 2500+ sq ft lots in non-rezoned, non-PEG areas" = "extend_broockman2",
-                        "Add Parisian zoning on 5000+ sq ft lots in non-rezoned, non-PEG areas" = "extend_broockman3",
-                        "Add Parisian zoning on 5000+ sq ft, non-MFR lots in non-rezoned, non-PEG areas" = "extend_broockman4",
-                      
-                        'Select an option.' = 'none'),
-                    selected = 'none'),
+
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
-        sliderInput("years_slider", 
-                    "Project housing production over the next number of years:", 
-                    min = 5, 
-                    max = 10, 
-                    value = 5,
-                    step = 1),
-        selectInput("map", "Select Mapping", 
-                    choices = c("Allowed Heights" = 'heights', 
-                                "Missing Potential Yield" = 'potential', 
-                                "E[Units]" = 'E[u]', 
-                                "Simulate Buildout" = 'sim'),
-                    selected = 'heights'),
-        conditionalPanel(
-          condition = "input.map == 'sim'",
-          actionButton("resimulateBtn", "Resimulate")
+
+        tags$head(
+          tags$script(HTML("
+            $(document).on('shiny:connected', function() {
+              $('#stories input[type=\"number\"]').css('background-color', '#f5f5f5');
+            });
+          "))
         ),
-        h4('Define a custom upzoning ⤵️️'),
+
+        HTML('<b>Define a custom upzoning️: </b>'),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
-                 tags$b("Upzone to "),
+                 HTML("Upzone to&nbsp;"),
                  numericInput("stories", label = NULL, value = 10, min = 4, max = 25),
-                 tags$b(" stories.")
+                 HTML("&nbsp;stories.")
         ),
         uiOutput("requirements_ui"),
-        actionButton("add_requirement", "Add a requirement"),
-        actionButton("delete_requirement", "Delete last requirement"),
+        actionButton("add_requirement", "Specify where"),
+        actionButton("delete_requirement", "Remove last"),
         tags$head(
           tags$style(HTML("
             #rezone {
@@ -163,6 +103,45 @@ ui <- fluidPage(
             "))
         ),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
+        HTML('<br></br> Project housing production over the next number of years:'),
+        sliderInput("years_slider", 
+                    NULL, 
+                    min = 5, 
+                    max = 10, 
+                    value = 5,
+                    step = 1),
+        HTML("<b>Overlays:</b>"),
+        
+        checkboxInput(
+          "affh",
+          label = list(
+            "High opportunity tracts",
+            span(
+              id = "affh_info",
+              class = "info-icon",
+              HTML(
+                '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by 2024 TCAC Map.</a>">&#9432;</span>'
+              )
+            )
+          )),
+        
+        checkboxInput("peg", label=list("Priority equity geographies",
+                                        span(
+                                          id = "peg_info",
+                                          class = "info-icon",
+                                          HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> SF cannot legally upzone the PEG for the housing element rezoning. Note that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
+                                          )
+                                        ))),
+        selectInput("map", "Map this", 
+                    choices = c("Allowed Heights" = 'heights', 
+                                "Missing Potential Yield" = 'potential', 
+                                "E[Units]" = 'E[u]', 
+                                "Simulate Buildout" = 'sim'),
+                    selected = 'heights'),
+        conditionalPanel(
+          condition = "input.map == 'sim'",
+          actionButton("resimulateBtn", "Resimulate")
+        ),
         position = "bottom-left"
       ),
 
