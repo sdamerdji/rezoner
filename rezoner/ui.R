@@ -154,6 +154,7 @@ ui <- fluidPage(
           condition = "input.map == 'sim'",
           actionButton("resimulateBtn", "Resimulate")
         ),
+        # plotlyOutput("pieChart"),
         position = "bottom-left"
       ),
 

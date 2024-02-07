@@ -7,6 +7,8 @@ library(sfarrow)
 library(stringr)
 library(RColorBrewer)
 library(compiler)
+library(plotly)
+library(ggplot2)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
@@ -498,6 +500,22 @@ server <- function(input, output, session) {
     return(paste0('Top Lots\n', yields))
   })
   
+  # output$pieChart <- renderPlotly({
+  #   added_capacity <- round(calculate_shortfall(df = updatedData()))
+  #   print(added_capacity)
+  #   
+  #   pie_data <- data.frame(
+  #     category = c("Added Capacity", "Remaining Shortfall"),
+  #     value = c(added_capacity, 36282 - added_capacity)
+  #   )
+  # 
+  #   plot_ly(pie_data, labels = ~category, values = ~value, type = 'pie',
+  #           marker = list(colors = c('green', 'grey')),
+  #           textinfo = 'hilvalue',
+  #           insidetextorientation = 'radial') %>%
+  #     layout(showlegend = F)
+  # })
+  # 
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
     print(added_capacity)
