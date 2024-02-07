@@ -384,8 +384,8 @@ server <- function(input, output, session) {
       df <- updatedData()
       df['block'] <- str_sub(df$mapblklot, 1, 4)
       df$n_stories <- (df$height - 5) %/% 10
-      df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
-      df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
+      df[!is.na(df$ZONING) & df$ZONING == fourplex & is.na(df$n_stories), 'n_stories'] <- 4
+      df[!is.na(df$ZONING) & df$ZONING == decontrol & is.na(df$n_stories), 'n_stories'] <- 4
       to_plot <- filter(df, !is.na(df$ZONING) & !is.na(expected_units) & expected_units > 0)
       simulate_buildout(to_plot)
     }
@@ -403,8 +403,9 @@ server <- function(input, output, session) {
     # Group by
     df['block'] <- str_sub(df$mapblklot, 1, 4)
     df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
-    df[!is.na(df$ZONING) & df$ZONING == fourplex, 'n_stories'] <- 4
-    df[!is.na(df$ZONING) & df$ZONING == decontrol, 'n_stories'] <- 4
+    df$n_stories <- (df$height - 5) %/% 10
+    df[!is.na(df$ZONING) & df$ZONING == fourplex & is.na(df$n_stories), 'n_stories'] <- 4
+    df[!is.na(df$ZONING) & df$ZONING == decontrol & is.na(df$n_stories), 'n_stories'] <- 4
     
     
     # Render
