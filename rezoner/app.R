@@ -487,18 +487,18 @@ server <- function(input, output, session) {
     return(final_output)
   })
   
-  output$most_units <- renderText({
-    values <- st_drop_geometry(updatedData()) %>% 
-      arrange(desc(net_units)) %>%
-      head(5) %>%
-      select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
-    yields <- paste0('Lot ', format(values$mapblklot), 
-                     " yields ", round(values$net_units), 
-                     ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
-                     'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
-                     ' acres\n', collapse='')
-    return(paste0('Top Lots\n', yields))
-  })
+  # output$most_units <- renderText({
+  #   values <- st_drop_geometry(updatedData()) %>% 
+  #     arrange(desc(net_units)) %>%
+  #     head(5) %>%
+  #     select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
+  #   yields <- paste0('Lot ', format(values$mapblklot), 
+  #                    " yields ", round(values$net_units), 
+  #                    ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
+  #                    'with ', values$ZONING, ' and ', round(values$ACRES, 1), 
+  #                    ' acres\n', collapse='')
+  #   return(paste0('Top Lots\n', yields))
+  # })
   
   # output$pieChart <- renderPlotly({
   #   added_capacity <- round(calculate_shortfall(df = updatedData()))
@@ -516,6 +516,14 @@ server <- function(input, output, session) {
   #     layout(showlegend = F)
   # })
   # 
+  output$dynamic_delete_button <- renderUI({
+      if(requirements$count > 0) {
+        actionButton("delete_requirement", "Remove last")
+        
+      }
+    }
+    )
+  
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
     print(added_capacity)
@@ -613,10 +621,10 @@ server <- function(input, output, session) {
           conditions <- c(conditions, paste0('(transit_dist_bart < ', distance, ')'))
         }
         
-        if('Rapid Bus Line' %in% relevant_transit) {
+        if('Muni Rapid Network' %in% relevant_transit) {
           conditions <- c(conditions, paste0('(transit_dist_rapid < ', distance, ')'))
         }
-        if('Bus Lines (<10 min headways)' %in% relevant_transit) {
+        if('All Muni Lines' %in% relevant_transit) {
           conditions <- c(conditions, paste0('(transit_dist < ', distance, ')'))
         }
         to_add <- paste(conditions, collapse = ' | ')
@@ -637,7 +645,7 @@ server <- function(input, output, session) {
         nhood <- input[[paste0(prefix, '-hood')]]
         to_add <- paste0('(nhood == "', nhood, '")')
       }
-      if (input[[paste0(prefix, '-is_in')]] == 'not in') {
+      if (input[[paste0(prefix, '-is_in')]] == FALSE) {
         to_add <- paste0('(!', to_add, ')')
       }
       new_expr <- paste(new_expr, to_add, sep=' & ')

@@ -52,8 +52,7 @@ ui <- fluidPage(
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Specify where"),
-
-        actionButton("delete_requirement", "Remove last"),
+        uiOutput("dynamic_delete_button", style = "display: inline-block;"),
         tags$head(
           tags$style(HTML("
             #rezone {
