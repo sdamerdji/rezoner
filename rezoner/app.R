@@ -4,11 +4,10 @@ library(sf)
 library(leaflet)
 library(shinyjs)
 library(sfarrow)
+library(shinyWidgets)
 library(stringr)
 library(RColorBrewer)
 library(compiler)
-library(plotly)
-library(ggplot2)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
 model <- readRDS(file='./light_model.rds') 
@@ -522,8 +521,63 @@ server <- function(input, output, session) {
         
       }
     }
-    )
+  )
   
+  output$dynamic_sort1 <- renderUI({
+    if ((length(user_rezoning$lists) > 0) | (length(input$sortable) > 0)) {
+      rez_list <- user_rezoning$lists
+      items <- sapply(rez_list, function(item) {
+        paste(item, collapse=", ")
+      })
+      
+      
+      if (length(items) != length(user_rezoning$lists)) {
+        print('hi!')
+      }
+      
+      rank_list(NULL, items, 'sortable', input_id='sortable')
+    }
+  })
+  
+  
+  output$all_things_sort <- renderUI({
+    if ((length(user_rezoning$lists) > 0) | (length(input$sortable) > 0)) {
+      div(
+    tags$div(
+      icon("trash"),
+      "Remove item",
+      id = "sortable_bin"
+    ),
+    sortable_js(
+      "sort1",
+      options = sortable_options(
+        group = list(
+          pull = TRUE,
+          name = "sortGroup1",
+          put = FALSE
+        ),
+        # swapClass = "sortable-swap-highlight",
+        onSort = sortable_js_capture_input("sort_vars")
+      )
+    ),
+    
+    sortable_js(
+      "sortable_bin",
+      options = sortable_options(
+        group = list(
+          group = "sortGroup1",
+          put = TRUE,
+          pull = TRUE
+        ),
+        onAdd = htmlwidgets::JS("function (evt) { 
+                                    this.el.removeChild(evt.item);
+                                    fr;
+                                    }")
+      )
+    )
+    )
+    }
+  })
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
     print(added_capacity)
@@ -577,6 +631,28 @@ server <- function(input, output, session) {
       removeUI(selector = paste0("#", last_id))
       requirements$count <- requirements$count - 1
       requirements$ids <- head(requirements$ids, -1)
+    }
+  })
+  
+
+  observeEvent(input$sortable, {
+    # Code to execute when an item is added
+    browser()
+    # For deleting
+    for (elem in names(user_rezoning$lists)) {
+      if (! elem %in% input$sortable) {
+        print('removing')
+        print(names(user_rezoning$lists))
+        user_rezoning$lists <- user_rezoning$lists[-which(names(user_rezoning$lists) == elem)]
+        print(names(user_rezoning$lists))
+      }
+    }
+    
+    # For reordering
+    if (length(user_rezoning$lists) == length(input$sortable)){
+      print('sorting')
+      user_rezoning$lists <- user_rezoning$lists[input$sortable]
+      print(names(user_rezoning$lists))
     }
   })
   
@@ -650,8 +726,13 @@ server <- function(input, output, session) {
       }
       new_expr <- paste(new_expr, to_add, sep=' & ')
     }
-    user_rezoning[['lists']][[paste0('list', 
-                          length(user_rezoning$lists))]] <- list(new_height_description = new_height_description, 
+    
+    # Find name for list
+    k <- 0
+    while(paste0('list', k) %in% names(user_rezoning[['lists']])) {
+      k <- k + 1
+    }
+    user_rezoning[['lists']][[paste0('list', k)]] <- list(new_height_description = new_height_description, 
                                                            new_expr = new_expr)
     
     # Correctly remove each dynamically added component

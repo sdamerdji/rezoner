@@ -1,6 +1,8 @@
 library(shiny)
 library(shinyjs)
 library(leaflet)
+library(shinyWidgets)
+library(sortable)
 source('./modules.R', local=T)
 
 ui <- fluidPage(
@@ -20,14 +22,15 @@ ui <- fluidPage(
       sidebarPanel(
         h4('Upzoning strategies:'),
         selectInput("scenario", NULL,
-                    choices = c("Current SF Planning Proposal" = "E",
+                    choices = c('Select' = 'blank',
+                                "Current SF Planning Proposal" = "E",
                                 "Fall 2023 SF Planning Proposal" = "D",
                                 "Housing Element Rezoning A" = "A",
                                 "Housing Element Rezoning B" = "B",
                                 "Housing Element Rezoning C" = "C",
                                 "Take the boldest elements of A, B, C, Fall, & current proposal" = "Union", 
                                 "Parisian zoning in low density neighborhoods" = "Parisian"),
-                    selected = 'E'),
+                    selected = 'blank'),
 
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
 
@@ -96,7 +99,7 @@ ui <- fluidPage(
                 position: absolute;
                 width: 100%;
                 height: 100%;
-                background: #111;
+                background: #14B8A6;
                 left: 0;
                 top: 0;
                 border-radius: 10px;
@@ -114,6 +117,10 @@ ui <- fluidPage(
           }
         ")),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
+        
+        uiOutput("dynamic_sort1"),  # Placeholder for dynamic content
+        uiOutput('all_things_sort'),
+        
         HTML('<br></br>'),
         tags$div(style = "display: flex; align-items: center; ", # Ensure alignment of text and input box
                  HTML("Project over&nbsp;"),
