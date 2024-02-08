@@ -120,7 +120,39 @@ ui <- fluidPage(
         
         uiOutput("dynamic_sort1"),  # Placeholder for dynamic content
         uiOutput('all_things_sort'),
+          tags$div(
+            icon("trash"),
+            "Remove item",
+            id = "sortable_bin"
+          ),
+        sortable_js(
+          "sort1",
+          options = sortable_options(
+            group = list(
+              pull = TRUE,
+              name = "sortGroup1",
+              put = FALSE
+            ),
+            # swapClass = "sortable-swap-highlight",
+            onSort = sortable_js_capture_input("sort_vars")
+          )
+        ),
         
+        sortable_js(
+          "sortable_bin",
+          options = sortable_options(
+            group = list(
+              group = "sortGroup1",
+              put = TRUE,
+              pull = TRUE
+            ),
+            onAdd = htmlwidgets::JS("function (evt) { 
+                                    this.el.removeChild(evt.item);
+                                    Shiny.setInputValue('item_deleted', true, {priority: 'event'});
+
+                                    }")
+          )
+        ),
         HTML('<br></br>'),
         tags$div(style = "display: flex; align-items: center; ", # Ensure alignment of text and input box
                  HTML("Project over&nbsp;"),

@@ -523,61 +523,6 @@ server <- function(input, output, session) {
     }
   )
   
-  output$dynamic_sort1 <- renderUI({
-    if ((length(user_rezoning$lists) > 0) | (length(input$sortable) > 0)) {
-      rez_list <- user_rezoning$lists
-      items <- sapply(rez_list, function(item) {
-        paste(item, collapse=", ")
-      })
-      
-      
-      if (length(items) != length(user_rezoning$lists)) {
-        print('hi!')
-      }
-      
-      rank_list(NULL, items, 'sortable', input_id='sortable')
-    }
-  })
-  
-  
-  output$all_things_sort <- renderUI({
-    if ((length(user_rezoning$lists) > 0) | (length(input$sortable) > 0)) {
-      div(
-    tags$div(
-      icon("trash"),
-      "Remove item",
-      id = "sortable_bin"
-    ),
-    sortable_js(
-      "sort1",
-      options = sortable_options(
-        group = list(
-          pull = TRUE,
-          name = "sortGroup1",
-          put = FALSE
-        ),
-        # swapClass = "sortable-swap-highlight",
-        onSort = sortable_js_capture_input("sort_vars")
-      )
-    ),
-    
-    sortable_js(
-      "sortable_bin",
-      options = sortable_options(
-        group = list(
-          group = "sortGroup1",
-          put = TRUE,
-          pull = TRUE
-        ),
-        onAdd = htmlwidgets::JS("function (evt) { 
-                                    this.el.removeChild(evt.item);
-                                    fr;
-                                    }")
-      )
-    )
-    )
-    }
-  })
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
     print(added_capacity)
@@ -634,10 +579,27 @@ server <- function(input, output, session) {
     }
   })
   
-
-  observeEvent(input$sortable, {
+  output$dynamic_sort1 <- renderUI({
+    rez_list <- user_rezoning$lists
+    items <- sapply(rez_list, function(item) {
+      paste(item, collapse=", ")
+    })
+    
+    
+    if (length(items) != length(user_rezoning$lists)) {
+      print('hi!')
+    }
+    
+    rank_list(NULL, items, 'sortable', input_id='sortable')
+  })
+  
+  observeEvent(c(input$item_deleted, input$sortable), {
     # Code to execute when an item is added
-    browser()
+    if (!is.null(input$item_deleted)) {
+    # Go through user_rezoning$lists and find whats deletted
+    print("An item was not added!")
+    }
+    
     # For deleting
     for (elem in names(user_rezoning$lists)) {
       if (! elem %in% input$sortable) {
