@@ -21,7 +21,7 @@ ui <- fluidPage(
     ),
     sidebarLayout(
       sidebarPanel(
-        h4('Upzoning strategies:'),
+        h4('Select a rezoning proposal'),
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
                                 "Current SF Planning Proposal" = "E",
@@ -43,7 +43,7 @@ ui <- fluidPage(
           "))
         ),
 
-        h4('Define a custom upzoning:'),
+        h4('Or add your own!'),
         tags$style(HTML("
           input#stories {
             background-color: #f7f7f7;
@@ -123,7 +123,7 @@ ui <- fluidPage(
         uiOutput('all_things_sort'),
           tags$div(
             icon("trash"),
-            "Remove item",
+            "Undo rezoning",
             id = "sortable_bin"
           ),
         sortable_js(

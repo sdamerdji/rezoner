@@ -19,9 +19,7 @@ options(shiny.fullstacktrace=TRUE)
 df <- readRDS('./four_rezonings_v5.RDS')
 
 geometries <- st_read_feather('./simple_geometries.feather')
-info_on_lldl <- paste0("Large is defined as >= 2500 sq ft&#013;", 
-                       "Low opportunity tracts are defined by the Draft 2024 TCAC Map&#013;",
-                       "Lots with existing multi-family residential uses or multi-family zoning are excluded.")
+
 
 # Years after rezoning
 fourplex <- "Increased density up to four units (six units on corner lots)"
@@ -540,7 +538,7 @@ server <- function(input, output, session) {
         text: { 
               position: "absolute",
               left: "50%",
-              top: "50%",
+              top: "75%",
               padding: "0",
               margin: "0",
               transform: "translate(-50%, 25%)",
@@ -570,6 +568,9 @@ server <- function(input, output, session) {
       bar.text.style.fontFamily = \'"Raleway", Helvetica, sans-serif\';
       bar.text.style.fontSize = "2rem";
       bar.animate(', shortfallValue / 36282, '); // Reactive value from server
+      if (', (shortfallValue / 36282) > 2, ') {
+          bar.set(', 100 * ((shortfallValue / 36282) %/% 100),')
+      }
       </script>'
     ))
     htmlOutput
@@ -581,11 +582,11 @@ server <- function(input, output, session) {
       return(NULL)
     }
     print(added_capacity)
-    updated_help <- HTML(paste0(
-      "In ", input$years_slider," years, this rezoning proposal helped build ",
+    updated_help <- paste0(
+      "In ", input$years_slider," years, this ", ifelse((added_capacity > 36282), 'amazing ', ''), "rezoning proposal helped build ",
       formatC(added_capacity, format="f", big.mark=",", digits=0),
       " "
-    ))
+    )
     
     congrats <- paste0(
       "homes, exceeding the legal minimum target by ", 
@@ -601,16 +602,16 @@ server <- function(input, output, session) {
     )
     
     if (length(user_rezoning$lists) == 0) {
-      sad <- paste0(sad, ' Why not try adding a custom rezoning to get the city on track?')
+      sad <- paste0(sad, ' Why not try adding your own rezoning plan to get the city on track?')
     } else {
       sad <- paste0(sad, " That's a lot of people who'd like to live here but can't.")
     }
     
     if (added_capacity > 36282) {
-      result <- HTML('<br></br><p>', updated_help, congrats, '</p>')
+      result <-  tags$div(HTML(updated_help, congrats), style="font-size: 1.25em;")
       shinyjs::runjs("sprayConfetti();") # Make sure this JS function is defined
     } else {
-      result <- HTML('<p>', updated_help, sad, '</p>')
+      result <-  tags$div(HTML(updated_help, sad), style="font-size: 1.25em;")
     }
     
     return(result)
@@ -646,10 +647,17 @@ server <- function(input, output, session) {
     rez_list <- user_rezoning$lists
     items <- sapply(rez_list, function(item) {
       print(item$new_expr)
-      paste(c(item$new_height_description, 
-              convert_logical_expression_to_english(item$new_expr)),
-            collapse=", ")
-    })
+      english <- convert_logical_expression_to_english(item$new_expr)
+      if (!is.null(english) && english != '') {
+        return(paste(c(as_n_stories(item$new_height_description), 
+                       english),
+                collapse=", "))
+      } else {
+        return(paste0(as_n_stories(item$new_height_description), ' everywhere.'))
+      }
+     
+    }
+    )
     
     
     if (length(items) != length(user_rezoning$lists)) {
