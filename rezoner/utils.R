@@ -17,12 +17,12 @@ convert_logical_expression_to_english <- function(expression) {
     }
 
     if(grepl("transit_dist", part)) {
-      distance <- gsub(".*< (0\\.\\d+)", "\\1", part)
+      distance <- gsub(".*< (0\\.\\d+)\\)*", "\\1", part)
       if (grepl('(\\(|\\))',distance)) {
-        distance <- gsub(".*< ((0\\.\\d+)|0|1)\\)", "\\1", part)
+        distance <- gsub(".*< ((0\\.\\d+)|0|1)\\)*", "\\1", part)
       }
 
-      transit_type <- gsub("^\\(*transit_dist_([^ ]*) <.*", "\\1", part)
+      transit_type <- gsub("^\\(*transit_dist_([^ ]*)\\)* <.*", "\\1", part)
       transit_name <- switch(transit_type,
                              bart = "BART",
                              caltrain = "Caltrain",
@@ -76,7 +76,7 @@ convert_logical_expression_to_english <- function(expression) {
 
 # # Apply parsing to each expression and handle potential NULLs gracefully
  expressions <- c(
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (transit_dist_bart < 0.25)",
+   "TRUE & !((ex_height2024 > 105) & sb330_applies) & ((transit_dist_bart < 0.25))",
    "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!peg) & (nhood == \"Mission\") & (transit_dist_caltrain < 0.25)",
    "TRUE & !((ex_height2024 > 105) & sb330_applies) & (peg) & (nhood == \"Outer Mission\") & (transit_dist_rapid < 0.2)",
    "TRUE & !((ex_height2024 > 105) & sb330_applies) & (transit_dist_caltrain < 0.35) | (transit_dist_rapid < 0.35) & (commercial_dist < 0.12)",
@@ -102,7 +102,7 @@ convert_logical_expression_to_english <- function(expression) {
     "not in a PEG; in the Mission neighborhood; within 0.25 miles of Caltrain",
     "in a PEG; in the Outer Mission neighborhood; within 0.2 miles of MUNI's rapid transit network",
     "within 0.35 miles of Caltrain; within 0.35 miles of MUNI's rapid transit network; within 0.12 miles of a commercial corridor",
-    "within 0.25 miles of Caltrain; within 0.25 miles of BART; within 0.25) miles of MUNI's rapid transit network",
+    "within 0.25 miles of Caltrain; within 0.25 miles of BART; within 0.25 miles of MUNI's rapid transit network",
     "not within 1 miles of BART",
     "within 0.04 miles of any MUNI line",
     "not on lots over 1.1 acres",
