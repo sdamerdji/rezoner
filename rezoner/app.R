@@ -136,7 +136,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   # See page 30 of Appendix B in Scenario A for reasoning
   building_efficiency_discount <- .8
   typical_unit_size <- 850
-
+  
   df <- df %>%
     mutate(zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
            zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
@@ -174,8 +174,8 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
            Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
            expected_units_if_dev = if_else(ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
     )
-
-    
+  
+  
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
     df <- df %>%
@@ -248,7 +248,7 @@ server <- function(input, output, session) {
   output$mainPlot <- renderLeaflet({
     generate_plot()
   })
-
+  
   observe({
     overlay <- input$peg
     multipolygon <- readRDS('./peg.RDS')
@@ -329,7 +329,7 @@ server <- function(input, output, session) {
           ex_height2024 = first(ex_height2024),
           sb330_applies = first(sb330_applies),
           .groups='keep')
-
+      
       to_plot <- st_sf(left_join(to_plot, geometries,
                                  by=c('block', 'M1_ZONING', 'M2_ZONING',
                                       'M3_ZONING', 'M4_ZONING')))
@@ -475,17 +475,17 @@ server <- function(input, output, session) {
     }
   })
   
-  output$supervisors <- renderText({
-    values <- st_drop_geometry(updatedData()) %>% 
-      group_by(sup_name) %>%
-      summarise(units = sum(net_units)) %>%
-      arrange(desc(units))
-    allocations <- paste0(format(values$sup_name, width=15), "\t", round(values$units), " units")
-    allocations_string <- paste(allocations, collapse="\n")
-    final_output <- paste0('Allocation by Supervisor\n', allocations_string)
-    
-    return(final_output)
-  })
+  # output$supervisors <- renderText({
+  #   values <- st_drop_geometry(updatedData()) %>% 
+  #     group_by(sup_name) %>%
+  #     summarise(units = sum(net_units)) %>%
+  #     arrange(desc(units))
+  #   allocations <- paste0(format(values$sup_name, width=15), "\t", round(values$units), " units")
+  #   allocations_string <- paste(allocations, collapse="\n")
+  #   final_output <- paste0('Allocation by Supervisor\n', allocations_string)
+  #   
+  #   return(final_output)
+  # })
   
   # output$most_units <- renderText({
   #   values <- st_drop_geometry(updatedData()) %>% 
@@ -517,11 +517,11 @@ server <- function(input, output, session) {
   # })
   # 
   output$dynamic_delete_button <- renderUI({
-      if(requirements$count > 0) {
-        actionButton("delete_requirement", "Remove last")
-        
-      }
+    if(requirements$count > 0) {
+      actionButton("delete_requirement", "Remove last")
+      
     }
+  }
   )
   
   output$customHtmlJs <- renderUI({
@@ -575,33 +575,44 @@ server <- function(input, output, session) {
     htmlOutput
   })
   
-  output$helpText <- renderText({
+  output$helpText <- renderUI({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
+    if (added_capacity == 0) {
+      return(NULL)
+    }
     print(added_capacity)
-    updated_help <- paste(
-      "Initial shortfall: 36,282 units. \nYou helped build: ",
+    updated_help <- HTML(paste0(
+      "In ", input$years_slider," years, this rezoning proposal helped build ",
       formatC(added_capacity, format="f", big.mark=",", digits=0),
-      "new units in",
-      input$years_slider,
-      'years.'
+      " "
+    ))
+    
+    congrats <- paste0(
+      "homes, exceeding the legal minimum target by ", 
+      formatC(added_capacity - 36282, format="f", big.mark=",", digits=0),
+      " homes. Academic research shows this will reduce local rents and displacement. Go you!"
     )
-    congrats <- paste("\nYOU MET THE GOAL AND ADDED AN EXTRA", 
-                      formatC(added_capacity - 36282, 
-                              format="f", big.mark=",", digits=0),
-                      "HOMES GO TEAM")
-    sad <-paste("\nThe remaining shortfall is:",
-                formatC(36282 - added_capacity, 
-                        format="f", big.mark=",", digits=0),
-                'units.')
+    
+    sad <- paste0(
+      "of 36,282 homes required by the city's housing plan, leaving the city ",
+      
+      formatC(36282 - added_capacity, format="f", big.mark=",", digits=0),
+      " homes short."
+    )
+    
+    if (length(user_rezoning$lists) == 0) {
+      sad <- paste0(sad, ' Why not try adding a custom rezoning to get the city on track?')
+    } else {
+      sad <- paste0(sad, " That's a lot of people who'd like to live here but can't.")
+    }
     
     if (added_capacity > 36282) {
-      result <- paste(updated_help, congrats)
-      
-      shinyjs::runjs("sprayConfetti();")
-      
+      result <- HTML('<br></br><p>', updated_help, congrats, '</p>')
+      shinyjs::runjs("sprayConfetti();") # Make sure this JS function is defined
     } else {
-      result <- paste(updated_help, sad)
+      result <- HTML('<p>', updated_help, sad, '</p>')
     }
+    
     return(result)
   })
   
@@ -636,8 +647,8 @@ server <- function(input, output, session) {
     items <- sapply(rez_list, function(item) {
       print(item$new_expr)
       paste(c(item$new_height_description, 
-                           convert_logical_expression_to_english(item$new_expr)),
-              collapse=", ")
+              convert_logical_expression_to_english(item$new_expr)),
+            collapse=", ")
     })
     
     
@@ -651,8 +662,8 @@ server <- function(input, output, session) {
   observeEvent(c(input$item_deleted, input$sortable), {
     # Code to execute when an item is added
     if (!is.null(input$item_deleted)) {
-    # Go through user_rezoning$lists and find whats deletted
-    print("An item was not added!")
+      # Go through user_rezoning$lists and find whats deletted
+      print("An item was not added!")
     }
     
     # For deleting
@@ -751,7 +762,7 @@ server <- function(input, output, session) {
       k <- k + 1
     }
     user_rezoning[['lists']][[paste0('list', k)]] <- list(new_height_description = new_height_description, 
-                                                           new_expr = new_expr)
+                                                          new_expr = new_expr)
     
     # Correctly remove each dynamically added component
     lapply(requirements$ids, function(id) removeUI(selector = paste0("#", id)))

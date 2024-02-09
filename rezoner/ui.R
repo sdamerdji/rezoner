@@ -201,7 +201,7 @@ ui <- fluidPage(
         leafletOutput("mainPlot", height = "600px"),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
         
-        span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
+        uiOutput("helpText"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
         #span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
