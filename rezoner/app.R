@@ -524,6 +524,57 @@ server <- function(input, output, session) {
     }
   )
   
+  output$customHtmlJs <- renderUI({
+    shortfallValue <- round(calculate_shortfall(df = updatedData()))
+    
+    htmlOutput <- HTML(paste0(
+      '<div id="container"></div>
+      <script>
+      var bar = new ProgressBar.SemiCircle(container, {
+        strokeWidth: 6,
+        trailColor: "#eee",
+        trailWidth: 1,
+        easing: "easeInOut",
+        duration: 2000,
+        svgStyle: {width: "50%", height: "100%", transform: "translate(50%, 0%)",},
+        text: { 
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              padding: "0",
+              margin: "0",
+              transform: "translate(-50%, 25%)",
+        },
+        from: {color: "#FFEA82"},
+        to: {color: "#ED6A5A"},
+              
+        step: (state, bar) => {
+
+          var value = Math.round(bar.value() * 100);
+          if (value > 100) {
+            bar.path.setAttribute("stroke", "#ED6A5A");
+            
+          }
+          else {
+            bar.path.setAttribute("stroke", state.color);
+          }
+          if (value == 0) {
+            bar.setText("Can you build enough homes?");
+          } else if  (value > 100) {
+            bar.setText("You built enough homes!");
+          } else {
+            bar.setText(value + "% of what\'s needed");
+          }
+        }
+      });
+      bar.text.style.fontFamily = \'"Raleway", Helvetica, sans-serif\';
+      bar.text.style.fontSize = "2rem";
+      bar.animate(', shortfallValue / 36282, '); // Reactive value from server
+      </script>'
+    ))
+    htmlOutput
+  })
+  
   output$helpText <- renderText({
     added_capacity <- round(calculate_shortfall(df = updatedData()))
     print(added_capacity)

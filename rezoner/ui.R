@@ -11,6 +11,7 @@ ui <- fluidPage(
   id = "main_content",
   tags$head(
     tags$script(src = "./js-confetti.browser.js"),
+    tags$script(src="./progressbar.js"),
     
     tags$head(
       tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
@@ -33,7 +34,7 @@ ui <- fluidPage(
                     selected = 'blank'),
 
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
-
+        
         tags$head(
           tags$script(HTML("
             $(document).on('shiny:connected', function() {
@@ -198,6 +199,8 @@ ui <- fluidPage(
 
       mainPanel(
         leafletOutput("mainPlot", height = "600px"),
+        uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
+        
         span(verbatimTextOutput("helpText"), style = "color:red; font-size:20px"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
         #span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
