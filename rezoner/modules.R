@@ -6,25 +6,24 @@ requirementUI <- function(id) {
   tagList(
     fluidRow(
       tags$style(HTML("
-      .bootstrap-switch-label {
-        height: 20px; /* Adjust the height as needed */
-        line-height: 20px; /* Align text vertically */
-        width: 161px;
+      .bootstrap-switch-container {
+        height: 36.99px; /* Adjust the height as needed */
+        line-height: 36.99px; /* Align text vertically */
+        width: 101px;
       }
     ")),
       tags$style(HTML("
-  #requirement1 > div.row > div.col-sm-4 > div > div > div {
+  #requirement > div.row > div.col-sm-4 > div > div > div {
     height: 35px; /* Adjust the height as needed */
     line-height: 35px; /* Align text vertically */
     width: 1070px;
   }
 ")),
       
-      column(4,div(class = "choose.isin", 
-                   switchInput(ns("is_in"),
+      column(4, switchInput(ns("is_in"),
                                NULL, 
                                onLabel = "in", offLabel = "not in", 
-                               value = TRUE, size='mini'))),
+                               value = TRUE, size='mini')),
     column(8, selectInput(ns("parcel_filter"), NULL, choices = c("Transit",
                                                        "Commercial Corridor", 
                                                        "Economic Opportunity", 
@@ -46,16 +45,16 @@ requirementServer <- function(id) {
       if (input$parcel_filter %in% c("Transit", "Commercial Corridor", "Economic Opportunity", 'TCAC', 'Neighborhood', 'Lot Size')) {
         if (input$parcel_filter == "Transit") {
           tagList(
-            sliderInput(session$ns("distance"), "Distance (miles)", min = 0, max = 1, value = 0.25),
+            sliderInput(session$ns("distance"), "Distance (miles)", min = 0, max = 1, value = 0.1),
             selectInput(session$ns("transit_options"), 
                         "From", 
-                        choices = c("BART Stops", "Caltrain Stops", 
+                        choices = c("Caltrain Stops", "BART Stops",
                                     "Muni Rapid Network", 'All Muni Lines'),
                         selected = 'BART Stops',
                         multiple=T)
           )
         } else if (input$parcel_filter == "Commercial Corridor") {
-          sliderInput(session$ns("distance"), "Distance (miles) from Commercial Corridor", min = 0, max = 1, value = 0.25)
+          sliderInput(session$ns("distance"), "Distance (miles) from Commercial Corridor", min = 0, max = 1, value = 0.1)
         } else if (input$parcel_filter == "Economic Opportunity") {
           sliderInput(session$ns("economic_score"), "Tracts with Economic Score of At Least", min = 0, max = 100, value = 50)
         } else if (input$parcel_filter == "TCAC") {

@@ -50,7 +50,7 @@ ui <- fluidPage(
         ")),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
                  HTML("Upzone to&nbsp;"),
-                 numericInput("stories", label = NULL, value = 10, min = 4, max = 25),
+                 numericInput("stories", label = NULL, value = 6, min = 4, max = 25),
                  HTML("&nbsp;stories.")
         ),
         uiOutput("requirements_ui"),
