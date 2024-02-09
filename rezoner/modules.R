@@ -50,7 +50,7 @@ requirementServer <- function(id) {
             selectInput(session$ns("transit_options"), 
                         "From", 
                         choices = c("BART Stops", "Caltrain Stops", 
-                                    "Rapid Bus Line", 'Bus Lines (<10 min headways)'),
+                                    "Muni Rapid Network", 'All Muni Lines'),
                         selected = 'BART Stops',
                         multiple=T)
           )

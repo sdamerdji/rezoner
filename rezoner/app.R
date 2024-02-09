@@ -582,7 +582,9 @@ server <- function(input, output, session) {
   output$dynamic_sort1 <- renderUI({
     rez_list <- user_rezoning$lists
     items <- sapply(rez_list, function(item) {
-      paste(item, collapse=", ")
+      paste(c(item$new_height_description, 
+                           convert_logical_expression_to_english(item$new_expr)),
+              collapse=", ")
     })
     
     
@@ -665,7 +667,7 @@ server <- function(input, output, session) {
         if('All Muni Lines' %in% relevant_transit) {
           conditions <- c(conditions, paste0('(transit_dist < ', distance, ')'))
         }
-        to_add <- paste(conditions, collapse = ' | ')
+        to_add <- paste0('(', paste(conditions, collapse = ' | '), ')')
       }
       else if (parcel_filter == 'Rapid Bus Line') {
         distance <- input[[paste0(prefix, '-distance')]]
