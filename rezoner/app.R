@@ -10,6 +10,7 @@ library(RColorBrewer)
 library(compiler)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
+source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 options(shiny.fullstacktrace=TRUE)
@@ -582,6 +583,7 @@ server <- function(input, output, session) {
   output$dynamic_sort1 <- renderUI({
     rez_list <- user_rezoning$lists
     items <- sapply(rez_list, function(item) {
+      print(item$new_expr)
       paste(c(item$new_height_description, 
                            convert_logical_expression_to_english(item$new_expr)),
               collapse=", ")
@@ -647,7 +649,7 @@ server <- function(input, output, session) {
         } else if (threshold == 'High') {
           in_expr = "c('High Resource', 'Highest Resource')"
         }
-        to_add <- paste0('(!is.na(affh2023) & affh2023 %in% ', in_expr, ')')
+        to_add <- paste0('(affh2023 %in% ', in_expr, ')')
       }
       else if (parcel_filter == 'Transit') {
         distance <- as.numeric(input[[paste0(prefix, '-distance')]])
@@ -684,6 +686,7 @@ server <- function(input, output, session) {
       else if (parcel_filter == 'Neighborhood') {
         nhood <- input[[paste0(prefix, '-hood')]]
         to_add <- paste0('(nhood == "', nhood, '")')
+        to_add <- paste0('(', paste0(to_add, collapse=' | '), ')')
       }
       if (input[[paste0(prefix, '-is_in')]] == FALSE) {
         to_add <- paste0('(!', to_add, ')')
