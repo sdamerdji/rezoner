@@ -14,11 +14,13 @@ source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
 options(shiny.fullstacktrace=TRUE)
+LAYER_ID = 'parcels_id'
 
 #df <- st_read_feather('./four_rezonings_v5.feather')
-df <- readRDS('./four_rezonings_v5.RDS')
-
-geometries <- st_read_feather('./simple_geometries.feather')
+#df <- readRDS('./four_rezonings_v5.RDS')
+#saveRDS(st_drop_geometry(df), './four_rezonings_v6.RDS')
+df <- readRDS('./four_rezonings_v6.RDS')
+df_mapbox <- readRDS('./sf_map.RDS')
 
 
 # Years after rezoning
@@ -27,6 +29,11 @@ decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
 parisian_height <- 75
 parisian <- paste0(parisian_height, "' Height Allowed")
+fill_style =
+  list(id = "parcels_id", type = "fill", source = "parcels_source",
+       fill_antialias = F,
+       filter = list("in", "mapblklot",  "fake"),
+       paint = list("fill-color" = "blue"))
 
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
@@ -170,9 +177,9 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
            existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
            Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
            Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-           expected_units_if_dev = if_else(ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
+           expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
+
     )
-  
   
   if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
     print("dont allow E[U|D] to exceed sf planninig's claim")
@@ -208,15 +215,19 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
 update_df <- cmpfun(update_df_)
 
 generate_plot <- function() {
-  leaflet(df) %>%
-    addProviderTiles(providers$CartoDB.Positron, 
-                     options = providerTileOptions(minZoom = 12, maxZoom = 16)) %>%
-    setMaxBounds(lng1 = -122.5149, lat1 = 37.7081, lng2 = -122.3564, lat2 = 37.8324)
+  mapboxer(maxBounds = c(c(-122.62473, 37.65792), c(-122.26922, 37.85880)),
+             attributionControl = FALSE,
+             style = basemaps$Carto$positron,
+             maxZoom = 16,
+             minZoom = 9,
+             zoom = 9
+    ) %>%
+      add_source(df_mapbox, id='parcels_source') %>%
+      add_layer(style=fill_style, popup='APN: {{mapblklot}}')
 }
 
 calculate_shortfall <- function(df) {
-  df2 <- select(df, -geometry)
-  return(upzone(df2))
+  return(upzone(df))
 }
 
 simulate_buildout <- function(to_plot) {
@@ -243,7 +254,7 @@ server <- function(input, output, session) {
     updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists))
   })
   
-  output$mainPlot <- renderLeaflet({
+  output$mainPlot <- renderMapboxer({
     generate_plot()
   })
   
@@ -293,8 +304,7 @@ server <- function(input, output, session) {
     print('updating map')
     print(input$map)
     df <- updatedData()  # Get the updated data
-    
-    
+
     # Group by
     df['block'] <- str_sub(df$mapblklot, 1, 4)
     df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
@@ -309,78 +319,76 @@ server <- function(input, output, session) {
     if (input$map == 'heights') {
       print('plot height')
       to_plot <- filter(df, !is.na(ZONING) & !is.na(expected_units) & expected_units > 0)
-      to_plot <- st_drop_geometry(to_plot)
-      print(paste0('pre group by took: ', round(Sys.time() - start, 1)))
-      # TODO: there is a fundamental problem I think in this code that I use
-      # a group by that includes ZONING
-      # I need to filter out parcels before simplify_geometries.R
-      to_plot <- to_plot %>%
-        group_by(block, M1_ZONING, M2_ZONING, M3_ZONING, M4_ZONING, ZONING) %>%
-        summarise(
-          pdev = mean(pdev),
-          expected_units_if_dev = sum(expected_units_if_dev),
-          n_stories = first(n_stories),
-          expected_units = sum(expected_units),
-          expected_units_baseline = sum(expected_units_baseline),
-          net_units = sum(net_units),
-          affh2023 = first(affh2023),
-          ex_height2024 = first(ex_height2024),
-          sb330_applies = first(sb330_applies),
-          .groups='keep')
-      
-      to_plot <- st_sf(left_join(to_plot, geometries,
-                                 by=c('block', 'M1_ZONING', 'M2_ZONING',
-                                      'M3_ZONING', 'M4_ZONING')))
-      # TODO: Fix this in simplify_geometries.R
-      # unmatched_geos <- geometries[!(geometries$geometry %in% to_plot$geometry),]
-      # unmatched_blocks <- st_drop_geometry(to_plot[st_is_empty(to_plot),])
-      # if (nrow(unmatched_blocks) > 1) {
-      #   extra <- st_sf(left_join(unmatched_blocks,  
-      #                      select(unmatched_geos, 'block'),
-      #                      by=c('block')))
-      #   to_plot <- rbind(extra, to_plot)
-      # }
-      #to_plot <- st_cast(to_plot, "MULTIPOLYGON")
+      apns <- unique(to_plot$mapblklot)
       print(paste0('Group by took: ', round(Sys.time() - start, 1)))
       start <- Sys.time() 
-      leafletProxy("mainPlot", 
-                   data = to_plot) %>%
-        clearGroup('parcels') %>%
-        clearGroup('dynamicMarkers') %>%
-        clearControls() %>%
-        addPolygons(
-          fillColor = ~ pal(n_stories),
-          color = ~ pal(n_stories),
-          fillOpacity = 1,
-          weight = 1,
-          group = 'parcels',
-          popup = ~ paste(
-            "New Zoning:",
-            ZONING,
-            '<br>Existing height:', ex_height2024, 
-            '<br>Block:', block,
-            '<br>TCAC:', affh2023,
-            "<br>Expected Units:",
-            formatC(round(net_units, 1),
-                    format='f', big.mark=',', digits=1),
-            '<br>P(Dev):',
-            formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
-            '%',
-            '<br>E(Units | Dev):',
-            formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
-          ),
-          labelOptions = labelOptions(
-            style = list("font-weight" = "normal", padding = "3px 8px"),
-            textsize = "13px",
-            direction = "auto"
-          )) %>%
-        addLegend(
-          "bottomright",
-          title = "Base Zoning",
-          colors = pal(c(1, 5, 8, 10, 20)),
-          labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
-          opacity = 0.5
-        )
+      new_map <- do.call(set_filter,
+              list(map = mapboxer_proxy("mainPlot"),
+                   layer_id = LAYER_ID,
+                   filter = c(list('in', 'mapblklot'), apns)))
+      
+      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$n_stories >= 5),]
+      apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
+                             to_plot$mapblklot, 
+                             pal(to_plot$n_stories), 
+                             SIMPLIFY = F)))
+      print(head(apn_to_color))
+      default_color <- pal(4)
+      arg_list <- list(new_map,
+                       layer_id=LAYER_ID, 
+                       property='fill_color', 
+                       value=c(list('match', 
+                                    list('get', 'mapblklot')), 
+                               unlist(unname(apn_to_color)), 
+                               default_color))
+      do.call(set_paint_property, arg_list) %>%
+        update_mapboxer()
+      # mapboxer_proxy("map") %>%
+      #   set_paint_property(layer_id = LAYER_ID,
+      #                      property = 'fill_color',
+                           # value = list('match',
+                           #              list('get', 'mapblklot'),
+                           #              '4304002', 'red',
+                           #              '7284001', 'green',
+                           #              'black')) %>%
+      #   update_mapboxer()
+      # mapboxer_proxy("mainPlot") %>%
+      #   clearGroup('parcels') %>%
+      #   clearGroup('dynamicMarkers') %>%
+      #   clearControls() %>%
+      #   addPolygons(
+      #     fillColor = ~ pal(n_stories),
+      #     color = ~ pal(n_stories),
+      #     fillOpacity = 1,
+      #     weight = 1,
+      #     group = 'parcels',
+      #     popup = ~ paste(
+      #       "New Zoning:",
+      #       ZONING,
+      #       '<br>Existing height:', ex_height2024, 
+      #       '<br>Block:', block,
+      #       '<br>TCAC:', affh2023,
+      #       "<br>Expected Units:",
+      #       formatC(round(net_units, 1),
+      #               format='f', big.mark=',', digits=1),
+      #       '<br>P(Dev):',
+      #       formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
+      #       '%',
+      #       '<br>E(Units | Dev):',
+      #       formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
+      #     ),
+      #     labelOptions = labelOptions(
+      #       style = list("font-weight" = "normal", padding = "3px 8px"),
+      #       textsize = "13px",
+      #       direction = "auto"
+      #     )) %>%
+      #   addLegend(
+      #     "bottomright",
+      #     title = "Base Zoning",
+      #     colors = pal(c(1, 5, 8, 10, 20)),
+      #     labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
+      #     opacity = 0.5
+      #   )
       print(paste0('Render took: ', round(Sys.time() - start, 1)))
       
       

@@ -1,6 +1,6 @@
 library(shiny)
 library(shinyjs)
-library(leaflet)
+library(mapboxer)
 library(shinyWidgets)
 library(sortable)
 source('./modules.R', local=T)
@@ -198,7 +198,7 @@ ui <- fluidPage(
       ),
 
       mainPanel(
-        leafletOutput("mainPlot", height = "600px"),
+        mapboxerOutput("mainPlot", height = "600px"),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
         
         uiOutput("helpText"),
