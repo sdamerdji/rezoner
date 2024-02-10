@@ -2,6 +2,7 @@ library(sf)
 library(stringr)
 library(sfarrow)
 library(dplyr)
+library(tidytransit)
 sf_use_s2(FALSE)
 start <- Sys.time()
 
@@ -32,7 +33,7 @@ econ_opp <- econ_opp %>%
   rename(econ_affh = ecn_dmn, affh2023=oppcat) %>%
   select(econ_affh, affh2023)
 results <- st_join(results, econ_opp, largest=T)
-
+results[is.na(results$affh2023), 'affh2023'] <- 'No data'
 
 ###### Priority equity geographies ###### 
 sud <- st_read('../Zoning Map - Special Use Districts_20240122.geojson')
@@ -114,14 +115,17 @@ st_write_feather(results2, '../four_rezonings_v3.feather')
 ###### MUNI LINES ######
 setwd('~/Desktop/rezoner2/rezoner')
 df <- st_read_feather('../four_rezonings_v3.feather')
-muni <- st_read('../Muni Simple Routes_20240202.geojson')
-frequent_lines <- muni[(muni$service_ca == '10 Minutes or Less'),]
-nearest = st_nearest_feature(df, frequent_lines)
-dist = st_distance(df, frequent_lines[nearest,], by_element=TRUE)
-df['transit_dist'] <- as.numeric(dist / 1609)
+gtfs_obj <- read_gtfs('../google_transit.zip')
+muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(df))
+uq_trips <- muni_geo$trips[!duplicated(muni_geo$trips[,c('route_id', 'shape_id')]),]
+muni <- inner_join(uq_trips, muni_geo$shapes)
+muni <- st_as_sf(muni, crs=st_crs(df))
+nearest = st_nearest_feature(df, muni)
+dist = st_distance(df, muni[nearest,], by_element=TRUE)
+df['transit_dist'] <- as.numeric(dist / 1609) # Distance to any muni line
 
 # Now just rapid muni lines
-rapid_lines <- muni[str_detect(muni$lineabbr, 'R$'),]
+rapid_lines <- muni[str_detect(muni$route_id, 'R$') | muni$route_id %in% c('J', 'L', 'K', 'M', 'N', 'T'),]
 nearest = st_nearest_feature(df, rapid_lines)
 dist = st_distance(df, rapid_lines[nearest,], by_element=TRUE)
 df['transit_dist_rapid'] <- as.numeric(dist / 1609)

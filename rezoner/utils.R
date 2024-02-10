@@ -74,23 +74,31 @@ convert_logical_expression_to_english <- function(expression) {
   return(paste(english_parts, collapse = "; "))
 }
 
+as_n_stories <- function(zoning_name) {
+  height <- as.numeric(str_extract(zoning_name, "\\d+"))
+  n_stories <- (height - 5) %/% 10
+  return(paste0(n_stories, ' stories'))
+}
+
 # # Apply parsing to each expression and handle potential NULLs gracefully
  expressions <- c(
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & ((transit_dist_bart < 0.25))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!peg) & (nhood == \"Mission\") & (transit_dist_caltrain < 0.25)",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (peg) & (nhood == \"Outer Mission\") & (transit_dist_rapid < 0.2)",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (transit_dist_caltrain < 0.35) | (transit_dist_rapid < 0.35) & (commercial_dist < 0.12)",
-   "TRUE & !((ex_height2024 > 85) & sb330_applies) & ((transit_dist_caltrain < 0.25) | (transit_dist_bart < 0.25) | (transit_dist_rapid < 0.25))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(transit_dist_bart < 1))",
-   "TRUE & !((ex_height2024 > 45) & sb330_applies) & (transit_dist < 0.04)",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(ACRES > 1.14630394857668))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (ACRES > 0.114784205693297)",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & !is.na(ZONING) & (!is.na(affh2023) & affh2023 %in% c('High Resource', 'Highest Resource'))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!!is.na(ZONING))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & ((nhood == \"Bernal Heights\") | (nhood == \"Castro/Upper Market\"))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!((nhood == \"Bernal Heights\") | (nhood == \"Bayview Hunters Point\") | (nhood == \"Castro/Upper Market\") | (nhood == \"Chinatown\") | (nhood == \"Excelsior\") | (nhood == \"Financial District/South Beach\") | (nhood == \"Glen Park\") | (nhood == \"Golden Gate Park\") | (nhood == \"Haight Ashbury\")))",
-   "TRUE & !((ex_height2024 > 105) & sb330_applies) & (econ_affh > 0.88)"
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & ((transit_dist_bart < 0.25))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!peg) & (nhood == \"Mission\") & (transit_dist_caltrain < 0.25)",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (peg) & (nhood == \"Outer Mission\") & (transit_dist_rapid < 0.2)",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (transit_dist_caltrain < 0.35) | (transit_dist_rapid < 0.35) & (commercial_dist < 0.12)",
+   # "TRUE & !((ex_height2024 > 85) & sb330_applies) & ((transit_dist_caltrain < 0.25) | (transit_dist_bart < 0.25) | (transit_dist_rapid < 0.25))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(transit_dist_bart < 1))",
+   # "TRUE & !((ex_height2024 > 45) & sb330_applies) & (transit_dist < 0.04)",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(ACRES > 1.14630394857668))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (ACRES > 0.114784205693297)",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & !is.na(ZONING) & (!is.na(affh2023) & affh2023 %in% c('High Resource', 'Highest Resource'))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!(affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!!is.na(ZONING))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & ((nhood == \"Bernal Heights\") | (nhood == \"Castro/Upper Market\"))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (!((nhood == \"Bernal Heights\") | (nhood == \"Bayview Hunters Point\") | (nhood == \"Castro/Upper Market\") | (nhood == \"Chinatown\") | (nhood == \"Excelsior\") | (nhood == \"Financial District/South Beach\") | (nhood == \"Glen Park\") | (nhood == \"Golden Gate Park\") | (nhood == \"Haight Ashbury\")))",
+   # "TRUE & !((ex_height2024 > 105) & sb330_applies) & (econ_affh > 0.88)",
+   "TRUE & !((ex_height2024 > 85) & sb330_applies) & (commercial_dist < 0.05)",
+   "TRUE & !((ex_height2024 > 85) & sb330_applies) & ((transit_dist_bart < 0.1))"
 
  )
 
@@ -98,21 +106,23 @@ convert_logical_expression_to_english <- function(expression) {
    
    # Hypothetical expected results, you would replace these with the actual ones
   expected_results <- c(
-    "within 0.25 miles of BART",
-    "not in a PEG; in the Mission neighborhood; within 0.25 miles of Caltrain",
-    "in a PEG; in the Outer Mission neighborhood; within 0.2 miles of MUNI's rapid transit network",
-    "within 0.35 miles of Caltrain; within 0.35 miles of MUNI's rapid transit network; within 0.12 miles of a commercial corridor",
-    "within 0.25 miles of Caltrain; within 0.25 miles of BART; within 0.25 miles of MUNI's rapid transit network",
-    "not within 1 miles of BART",
-    "within 0.04 miles of any MUNI line",
-    "not on lots over 1.1 acres",
-    "on lots over 0.11 acres",
-    "not already rezoned; TCAC Map Score of at least High",
-    "TCAC Map Score of less than Moderate",
-    "not already rezoned",
-    "in the Bernal Heights neighborhood; in the Castro/Upper Market neighborhood",
-    "not in the Bernal Heights neighborhood; in the Bayview Hunters Point neighborhood; in the Castro/Upper Market neighborhood; in the Chinatown neighborhood; in the Excelsior neighborhood; in the Financial District/South Beach neighborhood; in the Glen Park neighborhood; in the Golden Gate Park neighborhood; in the Haight Ashbury neighborhood",
-    "over 0.88 economic score."
+    # "within 0.25 miles of BART",
+    # "not in a PEG; in the Mission neighborhood; within 0.25 miles of Caltrain",
+    # "in a PEG; in the Outer Mission neighborhood; within 0.2 miles of MUNI's rapid transit network",
+    # "within 0.35 miles of Caltrain; within 0.35 miles of MUNI's rapid transit network; within 0.12 miles of a commercial corridor",
+    # "within 0.25 miles of Caltrain; within 0.25 miles of BART; within 0.25 miles of MUNI's rapid transit network",
+    # "not within 1 miles of BART",
+    # "within 0.04 miles of any MUNI line",
+    # "not on lots over 1.1 acres",
+    # "on lots over 0.11 acres",
+    # "not already rezoned; TCAC Map Score of at least High",
+    # "TCAC Map Score of less than Moderate",
+    # "not already rezoned",
+    # "in the Bernal Heights neighborhood; in the Castro/Upper Market neighborhood",
+    # "not in the Bernal Heights neighborhood; in the Bayview Hunters Point neighborhood; in the Castro/Upper Market neighborhood; in the Chinatown neighborhood; in the Excelsior neighborhood; in the Financial District/South Beach neighborhood; in the Glen Park neighborhood; in the Golden Gate Park neighborhood; in the Haight Ashbury neighborhood",
+    # "over 0.88 economic score.",
+    'within 0.05 miles of a commercial corridor',
+    "within 0.1 miles of BART"
   )
    
    actual_results <- sapply(expressions, convert_logical_expression_to_english)
