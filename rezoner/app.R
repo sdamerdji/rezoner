@@ -1,18 +1,26 @@
 library(shiny)
 library(dplyr)
 library(sf)
-library(leaflet)
 library(shinyjs)
 library(sfarrow)
 library(shinyWidgets)
 library(stringr)
 library(RColorBrewer)
+library(viridis)
+
 library(compiler)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
 source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
-pal <- colorBin("viridis",  bins = c(1, 5, 8, 10, 20, Inf), right = F)
+
+pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), palette = "viridis", right = FALSE) {
+  colors <- viridis::viridis(length(bins) - 1, option = palette)
+  colors <- stringr::str_sub(colors, 1, 7) # remove alpha channel
+  binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
+  return(colors[binIndex])
+}
+
 options(shiny.fullstacktrace=TRUE)
 LAYER_ID = 'parcels_id'
 
@@ -234,14 +242,13 @@ simulate_buildout <- function(to_plot) {
   sf_use_s2(T)
   to_plot <- to_plot[runif(nrow(to_plot)) < to_plot$pdev, ]
   to_plot[,'expected_units_if_dev'] <- to_plot$expected_units_if_dev / max(to_plot$expected_units_if_dev) * 1000
-  
-  leafletProxy("mainPlot", data = to_plot) %>%
-    clearGroup('parcels') %>%
-    clearGroup('dynamicMarkers') %>%
-    addCircles(lng = to_plot$lng,
-               lat = to_plot$lat,
-               radius = ~expected_units_if_dev,
-               group = 'dynamicMarkers')
+  # leafletProxy("mainPlot", data = to_plot) %>%
+  #   clearGroup('parcels') %>%
+  #   clearGroup('dynamicMarkers') %>%
+  #   addCircles(lng = to_plot$lng,
+  #              lat = to_plot$lat,
+  #              radius = ~expected_units_if_dev,
+  #              group = 'dynamicMarkers')
 }
 
 # Server logic
@@ -263,13 +270,10 @@ server <- function(input, output, session) {
     multipolygon <- readRDS('./peg.RDS')
     if (overlay) {
       # Add the multipolygon layer when overlay is TRUE
-      leafletProxy("mainPlot") %>%
-        addPolygons(data = multipolygon, fill = .1, group="peg", c='red', weight=.5)
-      
-    } else {
-      leafletProxy("mainPlot") %>%
-        clearGroup("peg")
-    }
+      # leafletProxy("mainPlot") %>%
+      #   addPolygons(data = multipolygon, fill = .1, group="peg", c='red', weight=.5)
+      print('FIX')
+    } 
   })
   
   observe({
@@ -277,13 +281,11 @@ server <- function(input, output, session) {
     multipolygon <- readRDS('./high_opp.RDS')
     if (overlay) {
       # Add the multipolygon layer when overlay is TRUE
-      leafletProxy("mainPlot") %>%
-        addPolygons(data = multipolygon, fill = NA, group="affh", color='black', weight=1)
-      
-    } else {
-      leafletProxy("mainPlot") %>%
-        clearGroup("affh")
-    }
+      # leafletProxy("mainPlot") %>%
+      #   addPolygons(data = multipolygon, fill = NA, group="affh", color='black', weight=1)
+      # 
+      print("FIX")
+    } 
   })
   observeEvent(c(input$resimulateBtn, input$map, input$scenario), {
     if (input$map == 'sim') {
@@ -332,7 +334,6 @@ server <- function(input, output, session) {
                              to_plot$mapblklot, 
                              pal(to_plot$n_stories), 
                              SIMPLIFY = F)))
-      print(head(apn_to_color))
       default_color <- pal(4)
       arg_list <- list(new_map,
                        layer_id=LAYER_ID, 
@@ -351,130 +352,77 @@ server <- function(input, output, session) {
                            #              '4304002', 'red',
                            #              '7284001', 'green',
                            #              'black')) %>%
-      #   update_mapboxer()
-      # mapboxer_proxy("mainPlot") %>%
-      #   clearGroup('parcels') %>%
-      #   clearGroup('dynamicMarkers') %>%
-      #   clearControls() %>%
-      #   addPolygons(
-      #     fillColor = ~ pal(n_stories),
-      #     color = ~ pal(n_stories),
-      #     fillOpacity = 1,
-      #     weight = 1,
-      #     group = 'parcels',
-      #     popup = ~ paste(
-      #       "New Zoning:",
-      #       ZONING,
-      #       '<br>Existing height:', ex_height2024, 
-      #       '<br>Block:', block,
-      #       '<br>TCAC:', affh2023,
-      #       "<br>Expected Units:",
-      #       formatC(round(net_units, 1),
-      #               format='f', big.mark=',', digits=1),
-      #       '<br>P(Dev):',
-      #       formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
-      #       '%',
-      #       '<br>E(Units | Dev):',
-      #       formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
-      #     ),
-      #     labelOptions = labelOptions(
-      #       style = list("font-weight" = "normal", padding = "3px 8px"),
-      #       textsize = "13px",
-      #       direction = "auto"
-      #     )) %>%
-      #   addLegend(
-      #     "bottomright",
-      #     title = "Base Zoning",
-      #     colors = pal(c(1, 5, 8, 10, 20)),
-      #     labels = c("< 4 Stories", "5 - 7 Stories", "8 - 9 Stories", "10 - 19 Stories", "20+ Stories"),
-      #     opacity = 0.5
-      #   )
+ 
       print(paste0('Render took: ', round(Sys.time() - start, 1)))
       
       
     } 
     else if (input$map == "potential") {
-      print('wya')
       sf_use_s2(T)
       to_plot <- df
       to_plot$missing_potential <- to_plot$expected_units_skyscraper - to_plot$expected_units
       to_plot$missing_potential <- pmax(to_plot$missing_potential, 0, na.rm=T) / to_plot$ACRES
       to_plot$missing_potential <- log10(1 + to_plot$missing_potential)
-      pal_pot <- colorNumeric(
-        palette = "Blues",
-        domain = c(0, 5))
+
       
-      leafletProxy("mainPlot", data = to_plot) %>%
-        clearGroup('parcels') %>%
-        clearGroup('dynamicMarkers') %>%
-        clearControls() %>%
-        addCircles(lng = to_plot$lng,
-                   lat = to_plot$lat,
-                   radius = ~pmin(to_plot$ACRES, .5, na.rm=T) * sqrt(4046.86),
-                   color = ~pal_pot(missing_potential),
-                   group = 'dynamicMarkers',
-                   fillOpacity = 1, 
-                   weight = 0,
-                   popup = ~ paste(
-                     "New Zoning:",
-                     ZONING,
-                     '<br>APN:', mapblklot,
-                     '<br>Missing Potential per Acre:', round((10**missing_potential) - 1, 1),
-                     "<br>Expected Units:",
-                     formatC(round(expected_units, 1),
-                             format='f', big.mark=',', digits=1),
-                     '<br>P(Dev):',
-                     formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
-                     '%',
-                     '<br>E(Units | Dev):',
-                     formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
-                   )) %>%
-        
-        addLegend(
-          "bottomright",
-          title = "Potential",
-          colors = pal_pot(c(1, 2, 3, 4)),
-          labels = c('<10 du/ac', '10-100 du/ac', '100-1000 du/ac', '1000+ du/ac')
-        )
+      # Example usage
+      pal_pot <- customColorNumeric(
+        domain = c(0, 5)
+      )
+
+      apns <- unique(to_plot$mapblklot)
+      new_map <- do.call(set_filter,
+              list(map = mapboxer_proxy("mainPlot"),
+                   layer_id = LAYER_ID,
+                   filter = c(list('in', 'mapblklot'), apns)))
+      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$missing_potential >= 1),]
+      
+      apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
+                                           to_plot$mapblklot, 
+                                           pal_pot(to_plot$missing_potential), 
+                                           SIMPLIFY = F)))
+      
+      arg_list <- list(new_map,
+                       layer_id=LAYER_ID, 
+                       property='fill_color', 
+                       value=c(list('match', 
+                                    list('get', 'mapblklot')), 
+                               unlist(unname(apn_to_color)), 
+                               pal_pot(0)))
+      do.call(set_paint_property, arg_list) %>%
+        update_mapboxer()
+      
       print('done')
     } 
     else if (input$map == 'E[u]') {
       to_plot <- filter(df, !is.na(ZONING) & !is.na(net_units) & net_units > 0)
       sf_use_s2(T)
       to_plot$net_units <- log10(1 + (to_plot$net_units/to_plot$ACRES))
-      pal_eu <- colorNumeric(
-        palette = "Blues",
-        domain = c(0, 3))
-      leafletProxy("mainPlot", data = to_plot) %>%
-        clearGroup('parcels') %>%
-        clearGroup('dynamicMarkers') %>%
-        clearControls() %>%
-        addCircles(lng = to_plot$lng,
-                   lat = to_plot$lat,
-                   color = ~pal_eu(pmin(net_units, 3)),
-                   radius =  ~pmin(ACRES, .5, na.rm=T) * sqrt(4046.86),
-                   group = 'dynamicMarkers',
-                   fillOpacity = ~(ifelse(net_units < 1, .1, 1)), 
-                   weight = 0,
-                   popup = ~ paste(
-                     "New Zoning:",
-                     ZONING,
-                     '<br>APN:', mapblklot,
-                     "<br>Expected Units:",
-                     formatC(round(net_units, 1),
-                             format='f', big.mark=',', digits=1),
-                     '<br>P(Dev):',
-                     formatC(round(pdev * 100, 2), format='f', big.mark=',', digits=2),
-                     '%',
-                     '<br>E(Units | Dev):',
-                     formatC(round(expected_units_if_dev, 1), format='f', big.mark=',', digits=1)
-                   )) %>%
-        addLegend(
-          "bottomright",
-          title = "Expected Units Added per Acre",
-          colors = pal_eu(c(1, 2, 3)),
-          labels = c('<10 units', '10-100 units', '100+ units')
-        )
+      pal_eu <- customColorNumeric(
+        domain = c(0, 4), n=3
+      )
+      apns <- unique(to_plot$mapblklot)
+      new_map <- do.call(set_filter,
+                         list(map = mapboxer_proxy("mainPlot"),
+                              layer_id = LAYER_ID,
+                              filter = c(list('in', 'mapblklot'), apns)))
+      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$net_units >= 1),]
+      
+      apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
+                                           to_plot$mapblklot, 
+                                           pal_eu(to_plot$net_units), 
+                                           SIMPLIFY = F)))
+      
+      arg_list <- list(new_map,
+                       layer_id=LAYER_ID, 
+                       property='fill_color', 
+                       value=c(list('match', 
+                                    list('get', 'mapblklot')), 
+                               unlist(unname(apn_to_color)), 
+                               pal_eu(0)))
+      do.call(set_paint_property, arg_list) %>%
+        update_mapboxer()
+
     } else if (input$map == 'sim') {
       to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
       simulate_buildout(to_plot)
@@ -576,8 +524,8 @@ server <- function(input, output, session) {
       bar.text.style.fontFamily = \'"Raleway", Helvetica, sans-serif\';
       bar.text.style.fontSize = "2rem";
       bar.animate(', shortfallValue / 36282, '); // Reactive value from server
-      if (', (shortfallValue / 36282) > 2, ') {
-          bar.set(', 100 * ((shortfallValue / 36282) %/% 100),')
+      if (', if((shortfallValue / 36282) > 2) 'true' else 'false', ') {
+          bar.set(', 100 * ((shortfallValue / 36282) %/% 100) ,')
       }
       </script>'
     ))
@@ -699,6 +647,59 @@ server <- function(input, output, session) {
       print(names(user_rezoning$lists))
     }
   })
+  
+  output$dynamicLegend <- renderUI({
+    if (input$map == "heights") {
+      layers <- c('0-4 stories',
+                  '5-7 stories',
+                  '8-9 stories',
+                  '10-19 stories',
+                  '20+ stories')
+      colors <- c('#440154',
+                  '#3B528B',
+                  '#21908C',
+                  '#5DC863',
+                  '#FDE725')
+      legend_name <- 'Base Zoning'
+    } else if (input$map == "potential") { # Potential
+      # Default or other conditions
+      legend_name <- 'Potential'
+      layers <- c("<10 du/ac", "10-100 du/ac", "100-1000 du/ac", '1000+ du/ac')
+      colors <- c("#EFF3FF", "#BDD7E7", "#6BAED6", "#3182BD", "#08519C") # Replace with appropriate color codes
+    } else if (input$map == "E[u]") { # Expect units added per acre
+      legend_name <- 'Expected du/ac added'
+      layers <- c("<10 du/ac", "10-100 du/ac", "100+ du/ac")
+      colors <- c("#EFF3FF", "#6BAED6", "#08519C") # Replace with appropriate color codes      
+    } else if (input$map == 'sim') {
+      assertthisshouldfail
+    }
+    
+    
+  
+  # Generate the HTML and JavaScript for the legend
+  HTML(paste0(
+    "<div class='map-overlay' id='legend'>Base Zoning</div>
+       <script>
+         document.getElementById('legend').innerHTML = '", legend_name, "'; // Clear existing legend
+         var layers = ", jsonlite::toJSON(layers, auto_unbox = TRUE), ";
+         var colors = ", jsonlite::toJSON(colors, auto_unbox = TRUE), ";
+         var legend = document.getElementById('legend');
+         layers.forEach((layer, i) => {
+           const color = colors[i];
+           const item = document.createElement('div');
+           const key = document.createElement('span');
+           key.className = 'legend-key';
+           key.style.backgroundColor = color;
+           const value = document.createElement('span');
+           value.innerHTML = `${layer}`;
+           item.appendChild(key);
+           item.appendChild(value);
+           legend.appendChild(item);
+         });
+       </script>"
+  ))
+})
+  
   
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories

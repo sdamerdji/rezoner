@@ -198,9 +198,49 @@ ui <- fluidPage(
       ),
 
       mainPanel(
-        mapboxerOutput("mainPlot", height = "600px"),
+        tags$style(HTML(
+          '.map-overlay {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: #fff;
+            margin-right: 20px;
+            font-family: Arial, sans-serif;
+            overflow: auto;
+            border-radius: 3px;
+          }
+          
+          #features {
+            top: 0;
+            height: 100px;
+            margin-top: 20px;
+            width: 250px;
+          }
+          
+          #legend {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(1 1 1 0.1);
+            line-height: 18px;
+
+          }
+          
+          .legend-key {
+            display: inline-block;
+            border-radius: 20%;
+            width: 10px;
+            height: 10px;
+            margin-right: 5px;
+          }'
+        )),
+        div(style = "position: relative;",
+            uiOutput("dynamicLegend"),
+            mapboxerOutput("mainPlot", height = "600px"),
+        ),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
-        
         uiOutput("helpText"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
         #span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),

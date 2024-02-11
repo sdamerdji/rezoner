@@ -1,5 +1,23 @@
 library(testthat)
 
+customColorNumeric <- function(domain, n=5) {
+  
+  colorFunc <- colorRampPalette(brewer.pal(n, 'Blues'))
+  
+  # Generate a continuous palette
+  continuousPalette <- colorFunc(n)
+  
+  # Map the domain to the 1:n
+  scaleFunc <- function(x) {
+    scaled <- (x - min(domain)) / (max(domain) - min(domain))
+    indices <- round(scaled * (n-1)) + 1
+    indices <- pmin(pmax(indices, 1), n) # Ensure indices stay within bounds
+    continuousPalette[indices]
+  }
+  
+  return(scaleFunc)
+}
+
 convert_logical_expression_to_english <- function(expression) {
   # Remove the common prefix
   expression <- gsub("TRUE & !\\(\\(ex_height2024 > (\\d+))\\) & sb330_applies\\) & ", "", expression)
