@@ -29,8 +29,8 @@ ui <- fluidPage(
                                 "Housing Element Rezoning A" = "A",
                                 "Housing Element Rezoning B" = "B",
                                 "Housing Element Rezoning C" = "C",
-                                "Take the boldest elements of A, B, C, Fall, & current proposal" = "Union", 
-                                "Parisian zoning in low density neighborhoods" = "Parisian"),
+                                "Draft SF YIMBY Plan - No Decontrol" = "yimby1", 
+                                "Draft SF YIMBY Plan - Decontrol" = "yimby2"),
                     selected = 'blank'),
 
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
@@ -160,34 +160,34 @@ ui <- fluidPage(
                  numericInput("years_slider", label = NULL, value = 5, min = 5, max = 10, width = '60px'),
                  HTML("&nbsp;years.")
         ),
-        h4("Overlays:"),
-        
-        checkboxInput(
-          "affh",
-          label = list(
-            "High opportunity tracts",
-            span(
-              id = "affh_info",
-              class = "info-icon",
-              HTML(
-                '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by 2024 TCAC Map.</a>">&#9432;</span>'
-              )
-            )
-          )),
-        
-        checkboxInput("peg", label=list("Priority equity geographies",
-                                        span(
-                                          id = "peg_info",
-                                          class = "info-icon",
-                                          HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> SF cannot legally upzone the PEG for the housing element rezoning. Note that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
-                                          )
-                                        ))),
+        # h4("Overlays:"),
+        # 
+        # checkboxInput(
+        #   "affh",
+        #   label = list(
+        #     "High opportunity tracts",
+        #     span(
+        #       id = "affh_info",
+        #       class = "info-icon",
+        #       HTML(
+        #         '<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> High opportunity is defined by 2024 TCAC Map.</a>">&#9432;</span>'
+        #       )
+        #     )
+        #   )),
+        # 
+        # checkboxInput("peg", label=list("Priority equity geographies",
+        #                                 span(
+        #                                   id = "peg_info",
+        #                                   class = "info-icon",
+        #                                   HTML('<span data-toggle="tooltip" data-popover="true" data-html=true data-content="<a> SF cannot legally upzone the PEG for the housing element rezoning. Note that this PEG SUD is not the final adopted SUD in the CRO, which added parts of North Beach and removed parts of Inner Richmond.</a>">&#9432;</span>'
+        #                                   )
+        #                                 ))),
         h4('Map this'),
         selectInput("map", NULL, 
                     choices = c("Allowed Heights" = 'heights', 
                                 "Missing Potential Yield" = 'potential', 
-                                "E[Units]" = 'E[u]', 
-                                "Simulate Buildout" = 'sim'),
+                                "E[Units]" = 'E[u]'), 
+                              #  "Simulate Buildout" = 'sim'),
                     selected = 'heights'),
         conditionalPanel(
           condition = "input.map == 'sim'",
@@ -243,7 +243,7 @@ ui <- fluidPage(
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
         uiOutput("helpText"),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
-        #span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
+        span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
         height = "600px"
       )
