@@ -32,6 +32,7 @@ df_mapbox <- readRDS('./sf_map.RDS')
 
 
 # Years after rezoning
+max_envelope <- max(df$Envelope_1000)
 fourplex <- "Increased density up to four units (six units on corner lots)"
 decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
@@ -106,32 +107,32 @@ yimbytown <- function(df) {
     union_of_maxdens() %>%
     # General transit upzoning in high opp areas with step down
     mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
                              (affh2023 %in% c('High Resource', 'Highest Resource')),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg &
+                             !peg & !((ex_height2024 > 55) & sb330_applies) &
                              (affh2023 %in% c('High Resource', 'Highest Resource')),
                            get_denser_zone("55' Height Allowed", ZONING),
                            ZONING)) %>%
     # Transit-oriented uzponing with step down for southern part of the city
     mutate(ZONING = ifelse((transit_dist_bart < .1) &
-                             !peg &
+                             !peg & !((ex_height2024 > 120) & sb330_applies) &
                              nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
                                           'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
                            get_denser_zone("120' Height Allowed", ZONING),
                            ZONING))  %>%
     mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
                                           'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside'),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg &
+                             !peg & !((ex_height2024 > 55) & sb330_applies) &
                              nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior', 
                                           'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
@@ -139,40 +140,41 @@ yimbytown <- function(df) {
                            ZONING)) %>%
     # Transit-oriented upzoning with step down for northern part of the city
     mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg &
+                             !peg & !((ex_height2024 > 120) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
                            get_denser_zone("120' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING)) %>%
     # Set a higher zoning floor for Marina, Russian Hill, Pac Heights, Nob Hill, North Beach 
-    mutate(ZONING = ifelse(!peg &
+    mutate(ZONING = ifelse(!peg & !((ex_height2024 > 55) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              (nhood %in% c('Marina', 'Russian Hill', 'Pacific Heights', 'Nob Hill', 'North Beach')),
                            get_denser_zone("55' Height Allowed", ZONING),
                            ZONING)) %>%
     # Transit-oriented upzoning for Portrero and Mission Bay
     mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              is.na(ZONING) &
                              nhood %in% c('Potrero Hill', 'Mission Bay'),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse((transit_dist_bart < .5 | transit_dist_caltrain < .5 | transit_dist_rapid < .5) &
-                             !peg &
+                             !peg & !((ex_height2024 > 65) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              is.na(ZONING) &
                              nhood %in% c('Potrero Hill', 'Mission Bay'),
                            get_denser_zone("65' Height Allowed", ZONING),
                            ZONING)) %>%
     # Geary and Masonic intersection
-    mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')),
+    mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')) &
+                           !((ex_height2024 > 240) & sb330_applies),
                            get_denser_zone("240' Height Allowed", ZONING),
                            ZONING))     
 }
@@ -261,6 +263,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
            #lot_coverage_discount = if_else(height > 85, .8, lot_coverage_discount), # David's code
            ground_floor = (ACRES * 43560) * lot_coverage_discount,
            Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000,
+           Envelope_1000_new = pmin(Envelope_1000_new, max_envelope),
            n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
                                           pmin(n_floors_residential, 12), 
                                           n_floors_residential),
@@ -270,6 +273,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
              height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
              TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
            ),
+           expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
            expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
            # no downzoning allowed
            existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
@@ -418,20 +422,31 @@ server <- function(input, output, session) {
               list(map = mapboxer_proxy("mainPlot"),
                    layer_id = LAYER_ID,
                    filter = c(list('in', 'mapblklot'), apns)))
+      # Find most common color and make it the default
+      print(paste('nrow to plot', nrow(to_plot)))
+      default_color <- names(which.max(table(pal(to_plot$n_stories))))
+      to_color <- to_plot[(pal(to_plot$n_stories) != default_color) & !duplicated(to_plot$mapblklot), c('mapblklot', 'n_stories')]
+      print(paste('nrow_tocolor', nrow(to_color)))
       
-      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$n_stories >= 5),]
       apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
-                             to_plot$mapblklot, 
-                             pal(to_plot$n_stories), 
+                             to_color$mapblklot, 
+                             pal(to_color$n_stories), 
                              SIMPLIFY = F)))
-      default_color <- pal(4)
-      arg_list <- list(new_map,
-                       layer_id=LAYER_ID, 
-                       property='fill_color', 
-                       value=c(list('match', 
-                                    list('get', 'mapblklot')), 
-                               unlist(unname(apn_to_color)), 
-                               default_color))
+
+      if (is.null(apn_to_color)) {
+        arg_list <- list(new_map,
+                         layer_id=LAYER_ID, 
+                         property='fill_color', 
+                         value=default_color)
+      } else {
+        arg_list <- list(new_map,
+                         layer_id=LAYER_ID, 
+                         property='fill_color', 
+                         value=c(list('match', 
+                                      list('get', 'mapblklot')), 
+                                 unlist(unname(apn_to_color)), 
+                                 default_color))
+      }
       do.call(set_paint_property, arg_list) %>%
         update_mapboxer()
       # mapboxer_proxy("map") %>%
@@ -459,14 +474,15 @@ server <- function(input, output, session) {
       pal_pot <- customColorNumeric(
         domain = c(0, 5)
       )
-
+      
+      
       apns <- unique(to_plot$mapblklot)
       new_map <- do.call(set_filter,
               list(map = mapboxer_proxy("mainPlot"),
                    layer_id = LAYER_ID,
                    filter = c(list('in', 'mapblklot'), apns)))
       to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$missing_potential >= 1),]
-      
+
       apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
                                            to_plot$mapblklot, 
                                            pal_pot(to_plot$missing_potential), 
@@ -614,7 +630,7 @@ server <- function(input, output, session) {
       bar.text.style.fontFamily = \'"Raleway", Helvetica, sans-serif\';
       bar.text.style.fontSize = "2rem";
       bar.animate(', shortfallValue / 36282, '); // Reactive value from server
-      if (', if((shortfallValue / 36282) > 2) 'true' else 'false', ') {
+      if (', if((shortfallValue / 36282) > 1) 'true' else 'false', ') {
           bar.set(', 100 * ((shortfallValue / 36282) %/% 100) ,')
       }
       </script>'
