@@ -179,6 +179,114 @@ yimbytown <- function(df) {
                            ZONING))     
 }
 
+yimbycity <- function(df) {
+  # Even better than a town is a city
+  df %>%
+    union_of_maxdens() %>%
+    # General transit upzoning in high opp areas with step down
+    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid_stops < .25) &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
+                             (affh2023 %in% c('High Resource', 'Highest Resource')),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse((transit_dist_bart < .33 | transit_dist_caltrain < .33 | transit_dist_rapid_stops < .33) &
+                             !peg & !((ex_height2024 > 55) & sb330_applies) &
+                             (affh2023 %in% c('High Resource', 'Highest Resource')),
+                           get_denser_zone("55' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Transit-oriented uzponing with step down for southern part of the city
+    mutate(ZONING = ifelse((transit_dist_bart < .1) &
+                             !peg & !((ex_height2024 > 120) & sb330_applies) &
+                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
+                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
+                           get_denser_zone("120' Height Allowed", ZONING),
+                           ZONING))  %>%
+    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid_stops < .25) &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
+                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside'),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse((transit_dist_bart < .33 | transit_dist_caltrain < .33 | transit_dist_rapid_stops < .33) &
+                             !peg & !((ex_height2024 > 55) & sb330_applies) &
+                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior', 
+                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
+                           get_denser_zone("55' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Transit-oriented upzoning with step down for northern part of the city
+    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid_stops < .25) &
+                             !peg & !((ex_height2024 > 120) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
+                           get_denser_zone("120' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse((transit_dist_bart < .33 | transit_dist_caltrain < .33 | transit_dist_rapid_stops < .33) &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Set a higher zoning floor for Marina, Russian Hill, Pac Heights, Nob Hill, North Beach 
+    mutate(ZONING = ifelse(!peg & !((ex_height2024 > 55) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             (nhood %in% c('Marina', 'Russian Hill', 'Pacific Heights', 'Nob Hill', 'North Beach')),
+                           get_denser_zone("55' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Transit-oriented upzoning for Portrero and Mission Bay
+    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid_stops < .25) &
+                             !peg & !((ex_height2024 > 85) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             is.na(ZONING) &
+                             nhood %in% c('Potrero Hill', 'Mission Bay'),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse((transit_dist_bart < .5 | transit_dist_caltrain < .5 | transit_dist_rapid_stops < .5) &
+                             !peg & !((ex_height2024 > 65) & sb330_applies) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             is.na(ZONING) &
+                             nhood %in% c('Potrero Hill', 'Mission Bay'),
+                           get_denser_zone("65' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Geary and Masonic intersection
+    mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')) &
+                             !((ex_height2024 > 240) & sb330_applies),
+                           get_denser_zone("240' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Within .1 miles of parks to 55'
+    mutate(ZONING = ifelse((park_dist < .1) &
+                             !peg & 
+                             !((ex_height2024 > 55) & sb330_applies),
+                           get_denser_zone("55' Height Allowed", ZONING),
+                           ZONING)) %>%
+    # Within .1 miles of a college, to 85
+    mutate(ZONING = ifelse((college_dist < .1) &
+                             !peg & 
+                             !((ex_height2024 > 85) & sb330_applies),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse(((stringr::str_sub(df$mapblklot, 1, 4) %in% c('3536', '2540')) | # Castro Safeway, Arden Wood
+                              (df$mapblklot %in% c('1095005', '1098050', '1079025', '1539003')) |  # Inner RIchmond Kaiser Permanente
+                              (df$mapblklot %in% c('1691019', '0446002', '0446003'))) & # La Playa Safeway and Marina Safeway
+                             !peg & 
+                             !((ex_height2024 > 140) & sb330_applies),
+                           get_denser_zone("140' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse(((df$mapblklot %in% c('1094001', '1214017', '1214008', '1214001'))) & # City center, dmv
+                             !peg & 
+                             !((ex_height2024 > 300) & sb330_applies),
+                           get_denser_zone("300' Height Allowed", ZONING),
+                           ZONING)) %>%
+    mutate(ZONING = ifelse(((stringr::str_sub(df$mapblklot, 1, 5) %in% c('14380', '72555'))) & # smart final, lakeshore plaza
+                             !peg & 
+                             !((ex_height2024 > 85) & sb330_applies),
+                           get_denser_zone("85' Height Allowed", ZONING),
+                           ZONING))
+}
+# 1094001 - city center
+
 update_df_ <- function(scenario, n_years, user_rezonings) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
@@ -222,9 +330,12 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   if (scenario == 'yimby2') {
     df <- yimbytown(df)
     df[!is.na(df$ZONING) & (df$ZONING == fourplex), 'ZONING'] <- decontrol
-    
     # .1 miles from rapid transit, bart, caltrain, 
     # Upzone 
+  }
+  if (scenario == 'yimby3') {
+    df <- yimbycity(df)
+    df[!is.na(df$ZONING) & (df$ZONING == fourplex), 'ZONING'] <- decontrol
   }
   
   #squo_zoning <- df[is.na(df$ZONING),]
@@ -849,7 +960,7 @@ server <- function(input, output, session) {
         }
         
         if('Muni Rapid Network' %in% relevant_transit) {
-          conditions <- c(conditions, paste0('(transit_dist_rapid < ', distance, ')'))
+          conditions <- c(conditions, paste0('(transit_dist_rapid_stops < ', distance, ')'))
         }
         if('All Muni Lines' %in% relevant_transit) {
           conditions <- c(conditions, paste0('(transit_dist < ', distance, ')'))
@@ -863,6 +974,14 @@ server <- function(input, output, session) {
       else if (parcel_filter == 'Commercial Corridor') {
         distance <- input[[paste0(prefix, '-distance')]]
         to_add <- paste0('(commercial_dist < ', as.numeric(distance), ')')
+      }
+      else if (parcel_filter == 'Parks') {
+        distance <- input[[paste0(prefix, '-distance')]]
+        to_add <- paste0('(park_dist < ', as.numeric(distance), ')')
+      }
+      else if (parcel_filter == 'Colleges') {
+        distance <- input[[paste0(prefix, '-distance')]]
+        to_add <- paste0('(college_dist < ', as.numeric(distance), ')')
       }
       else if (parcel_filter == 'Lot Size') {
         sqft_lot_size <- input[[paste0(prefix, '-lot_size')]]
