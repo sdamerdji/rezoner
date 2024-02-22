@@ -31,7 +31,9 @@ requirementUI <- function(id) {
                                                        'TCAC',
                                                        "Already Rezoned",
                                                        "Neighborhood",
-                                                       'Lot Size')))
+                                                       'Lot Size', 
+                                                       'Parks', 
+                                                       'Colleges')))
     ),
     uiOutput(ns("dynamic_slider")) # Placeholder for dynamic slider UI
     
@@ -42,7 +44,7 @@ requirementUI <- function(id) {
 requirementServer <- function(id) {
   moduleServer(id, function(input, output, session) {
     output$dynamic_slider <- renderUI({
-      if (input$parcel_filter %in% c("Transit", "Commercial Corridor", "Economic Opportunity", 'TCAC', 'Neighborhood', 'Lot Size')) {
+      if (input$parcel_filter %in% c("Transit", "Commercial Corridor", "Economic Opportunity", 'TCAC', 'Neighborhood', 'Lot Size', 'Parks', 'Colleges')) {
         if (input$parcel_filter == "Transit") {
           tagList(
             sliderInput(session$ns("distance"), "Distance (miles)", min = 0, max = 1, value = 0.1),
@@ -63,7 +65,11 @@ requirementServer <- function(id) {
           sliderInput(session$ns("lot_size"), "Lot Area (Sq Ft) Larger Than", min = 0, max = 50000, value = 5000)
         } else if (input$parcel_filter == "Neighborhood") {
           selectInput(session$ns("hood"), "Pick a neighborhood", choices=readRDS('./hoods.RDS'), multiple=T)
-        }
+        } else if (input$parcel_filter == "Parks") {
+          sliderInput(session$ns("distance"), "Distance (miles) from Parks (1+ Acres)", min = 0, max = 1, value = 0.1)
+        } else if (input$parcel_filter == "Colleges") {
+          sliderInput(session$ns("distance"), "Distance (miles) from Colleges", min = 0, max = 1, value = 0.1)
+        } 
       } else {
         return(NULL)
       }
