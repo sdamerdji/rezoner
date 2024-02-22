@@ -1,5 +1,6 @@
 library(shiny)
 library(shinyjs)
+library(shinyBS)
 library(mapboxer)
 library(shinyWidgets)
 library(sortable)
@@ -7,17 +8,34 @@ source('./modules.R', local=T)
 
 ui <- fluidPage(
   useShinyjs(),  # Initialize shinyjs
-
+  #useShinyBS(),
   id = "main_content",
+  title = 'Upzone SF!',
   tags$head(
     tags$script(src = "./js-confetti.browser.js"),
     tags$script(src="./progressbar.js"),
-    
+    tags$style('.popover{max-width: 100%;}'),
     tags$head(
       tags$link(rel = "shortcut icon", type = "image/png", href = "sfy.png")
     ),
     titlePanel(
-      "Upzone the City"
+      div("Upzone the City",  style={'padding-left: 34%; display: flex; justify-content: space-between; align-items: center;"'},
+      popify(a("About",
+               target = "_blank",
+               style = "margin-right: 20px; font-size:20px"),
+             title='hi there', 
+             content= HTML(paste0('Thanks so much for toying around with this tool! You should know a bit about how it came to be.',
+                            '<br><br>Tasked with tripling annual housing production, the city of SF agreed to use data and a statistical model so ',
+                            'its rezoning would put the city on track to succeed with its housing target. ',
+                            'The city paid the Blue Sky consulting firm to build such a model, which is the model under the hood of this web app.',
+                            '<br><br>This web app faithfully recreates Blue Sky&apos;s logistic regression model for predicting whether parcels are redeveloped (Appendix B.2),',
+                            ' SF Planning&apos;s heuristics for estimating the size of projects that do get built (pages 43-45; Appendix B), and the historical ',
+                            'adjustment for state density bonus units (page 4; Appendix B.2).',
+                            '<br><br>You should know that this model makes a number of key assumptions: that the economic environment looks like 2016, ',
+                            'that statistical associations of the past will hold for hypothetical rezonings, ',
+                            'and that projects will be built quite close to their maximum feasible capacity.',
+                            '<br><br>Rather than using this model&apos;s output as a single source of truth, we&apos;d recommend evaluating a rezoning proposal',
+                            ' against multiple models to ensure that the findings are robust to a range of different assumptions.'))))
     ),
     sidebarLayout(
       sidebarPanel(
@@ -29,8 +47,9 @@ ui <- fluidPage(
                                 "Housing Element Rezoning A" = "A",
                                 "Housing Element Rezoning B" = "B",
                                 "Housing Element Rezoning C" = "C",
-                                "Draft SF YIMBY Plan - No Decontrol" = "yimby1", 
-                                "Draft SF YIMBY Plan - Decontrol" = "yimby2"),
+                                "Draft SF YIMBY Plan - No Decontrol in RH" = "yimby1", 
+                                "Draft SF YIMBY Plan - Decontrol in RH" = "yimby2",
+                                "Draft SF YIMBY Plan v2 - Decontrol in RH" = "yimby3"),
                     selected = 'blank'),
 
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
@@ -241,7 +260,9 @@ ui <- fluidPage(
             mapboxerOutput("mainPlot", height = "600px"),
         ),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
+        HTML('<br> </br>'),
         uiOutput("helpText"),
+        HTML('<br>Superuser output:</br>'),
         span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
         span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
