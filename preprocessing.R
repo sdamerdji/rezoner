@@ -125,11 +125,21 @@ dist = st_distance(df, muni[nearest,], by_element=TRUE)
 df['transit_dist'] <- as.numeric(dist / 1609) # Distance to any muni line
 
 # Now just rapid muni lines
+sf_use_s2(T)
 rapid_lines <- muni[str_detect(muni$route_id, 'R$') | muni$route_id %in% c('J', 'L', 'K', 'M', 'N', 'T'),]
 nearest = st_nearest_feature(df, rapid_lines)
-dist = st_distance(df, rapid_lines[nearest,], by_element=TRUE)
+dist = st_distance(df, rapid_lines[nearest,], by_element=TRUE, tolerance=10)
 df['transit_dist_rapid'] <- as.numeric(dist / 1609)
 
+# Now just rapid muni stops
+rapid_lines <- muni[str_detect(muni$route_id, 'R$') | muni$route_id %in% c('J', 'L', 'K', 'M', 'N', 'T'),]
+# Find stops 
+rapid_stops <- inner_join(rapid_lines, gtfs_obj$stop_times, by='trip_id')
+rapid_stop_sf <- inner_join(st_drop_geometry(rapid_stops), gtfs_obj$stops)
+rapid_stops <- st_as_sf(rapid_stop_sf, coords=c('stop_lon', 'stop_lat'), crs=st_crs(df))
+nearest = st_nearest_feature(df, rapid_stops)
+dist = st_distance(df, rapid_stops[nearest,], by_element=TRUE, tolerance=10)
+df['transit_dist_rapid_stops'] <- as.numeric(dist / 1609)
 
 ###### BART & CALTRIAIN #######
 # Bart
@@ -149,20 +159,42 @@ df['transit_dist_caltrain'] <- as.numeric(dist / 1609)
 print(paste('Transit', round(Sys.time() - start, 1)))
 
 ###### COMMERCIAL CORRIDORS ###### 
+sf_use_s2(F)
 zoning <- st_read('../Zoning Map - Zoning Districts.geojson')
 commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),] #TODO: Ask Annie if correct
 
 nearest = st_nearest_feature(df, commercial_corridors)
-dist = st_distance(df, commercial_corridors[nearest,], by_element=TRUE)
+dist = st_distance(df, commercial_corridors[nearest,], by_element=TRUE, tolerance=10)
 df['commercial_dist'] <- as.numeric(dist / 1609)
 
 ####### NEIGHBORHOODS ####### 
+sf_use_s2(T)
 hoods <- st_read('../Analysis Neighborhoods_20240202.geojson')
 saveRDS(sort(hoods$nhood), './hoods.RDS')
 result <- st_join(df, hoods, largest=T)
 
 
+####### PARKS ####### 
+sf_use_s2(F)
+df <- readRDS('./four_rezonings_v4.RDS')
+parks <- st_read('../Park Lands - Recreation and Parks Department.geojson')
+parks$acres = as.numeric(parks$acres)
+parks = parks[parks$map_park_n != 'Camp Mather',]
+parks = parks[parks$acres > 1,]
+nearest = st_nearest_feature(df, parks)
+dist = st_distance(df, parks[nearest,], by_element=TRUE, tolerance=10)
+df['park_dist'] <- as.numeric(dist / 1609)
+
+###### COLLEGES ######
+colleges <- st_read('../Schools_College_20240215.geojson')
+colleges = colleges[as.numeric(st_area(colleges)) / 4047 > 1,]
+nearest = st_nearest_feature(df, colleges)
+dist = st_distance(df, colleges[nearest,], by_element=TRUE, tolerance=10)
+df['college_dist'] <- as.numeric(dist / 1609)
+
+
 #### TRY RDS INSTEAD OF FEATHER. IT TAKES A THIRD OF THE TIME. ####
-saveRDS(result, './four_rezonings_v4.RDS')
+saveRDS(df, './four_rezonings_v4.RDS')
 print(paste('All', Sys.time() - start))
+
 
