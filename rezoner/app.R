@@ -646,30 +646,6 @@ server <- function(input, output, session) {
     }
   })
   
-  output$supervisors <- renderText({
-    values <- st_drop_geometry(updatedData()) %>%
-      group_by(sup_name) %>%
-      summarise(units = sum(net_units)) %>%
-      arrange(desc(units))
-    allocations <- paste0(format(values$sup_name, width=15), "\t", round(values$units), " units")
-    allocations_string <- paste(allocations, collapse="\n")
-    final_output <- paste0('Allocation by Supervisor\n', allocations_string)
-
-    return(final_output)
-  })
-  
-  output$most_units <- renderText({
-    values <- st_drop_geometry(updatedData()) %>%
-      arrange(desc(net_units)) %>%
-      head(5) %>%
-      select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units)
-    yields <- paste0('Lot ', format(values$mapblklot),
-                     " yields ", round(values$net_units),
-                     ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
-                     'with ', values$ZONING, ' and ', round(values$ACRES, 1),
-                     ' acres\n', collapse='')
-    return(paste0('Top Lots\n', yields))
-  })
   
   # output$pieChart <- renderPlotly({
   #   added_capacity <- round(calculate_shortfall(df = updatedData()))
