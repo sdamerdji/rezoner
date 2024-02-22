@@ -707,7 +707,7 @@ server <- function(input, output, session) {
           }
           if (value == 0) {
             bar.setText("Can you build enough homes?");
-          } else if  (value > 100) {
+          } else if  (value >= 100) {
             bar.setText("You built enough homes!");
           } else {
             bar.setText(value + "% of what\'s needed");
@@ -716,12 +716,12 @@ server <- function(input, output, session) {
       });
       bar.text.style.fontFamily = \'"Raleway", Helvetica, sans-serif\';
       bar.text.style.fontSize = "2rem";
-      bar.animate(', shortfallValue / 36282, '); // Reactive value from server
-      if (', if((shortfallValue / 36282) > 1) 'true' else 'false', ') {
-          bar.set(', 100 * ((shortfallValue / 36282) %/% 100) ,')
-      }
+      bar.animate(', if((shortfallValue / 36282) > 1) 2*((shortfallValue / 36282) %/% 1) - 1 else (shortfallValue / 36282), '); // Reactive value from server
       </script>'
     ))
+    print(paste('bar.animate',  shortfallValue / 36282))
+    
+    print(paste('bar.set',  ((shortfallValue / 36282) %/% 1) ))
     htmlOutput
   })
   
