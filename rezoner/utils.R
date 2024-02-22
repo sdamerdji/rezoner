@@ -56,7 +56,24 @@ convert_logical_expression_to_english <- function(expression) {
 
       distance_phrase <- if (negated) "not within" else "within"
       english_parts <- c(english_parts, paste(distance_phrase, distance, "miles of a commercial corridor"))
-    } else if(grepl("econ_affh", part)) {
+    } else if(grepl("park_dist", part)) {
+      distance <- gsub(".*< (0\\.\\d+)", "\\1", part)
+      if (grepl('(\\(|\\))',distance)) {
+        distance <- gsub(".*< ((0\\.\\d+)|0|1)\\)", "\\1", part)
+      }
+      
+      distance_phrase <- if (negated) "not within" else "within"
+      english_parts <- c(english_parts, paste(distance_phrase, distance, "miles of a 1+ acre park"))
+    } else if(grepl("college_dist", part)) {
+      distance <- gsub(".*< (0\\.\\d+)", "\\1", part)
+      if (grepl('(\\(|\\))',distance)) {
+        distance <- gsub(".*< ((0\\.\\d+)|0|1)\\)", "\\1", part)
+      }
+      
+      distance_phrase <- if (negated) "not within" else "within"
+      english_parts <- c(english_parts, paste(distance_phrase, distance, "miles of a college"))
+    } 
+    else if(grepl("econ_affh", part)) {
       econ_affh <- gsub(".*> (0\\.\\d+)", "\\1", part)
       if (grepl('(\\(|\\))', econ_affh)) {
         econ_affh <- gsub(".*> ((0\\.\\d+)|0|1)\\)", "\\1", part)
