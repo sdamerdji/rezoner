@@ -174,7 +174,7 @@ yimbytown <- function(df) {
                            ZONING)) %>%
     # Geary and Masonic intersection
     mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')) &
-                           !((ex_height2024 > 240) & sb330_applies),
+                             !((ex_height2024 > 240) & sb330_applies),
                            get_denser_zone("240' Height Allowed", ZONING),
                            ZONING))     
 }
@@ -324,7 +324,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   }
   if (scenario == 'Union') {
     df <- union_of_maxdens(df)
-
+    
   }
   if (scenario == 'Parisian') {
     df['ZONING'] <- df$M5_ZONING
@@ -332,7 +332,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   }
   if (scenario == 'yimby1') {
     df <- yimbytown(df)
-
+    
     # .1 miles from rapid transit, bart, caltrain, 
     # Upzone 
   }
@@ -364,57 +364,57 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   
   df <- df %>%
     mutate(
-           # Update zoning indicators for blue sky regression
-           zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
-           zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
-           zp_Public = if_else(!is.na(ZONING), 0, zp_Public),
-           zp_Redev = if_else(!is.na(ZONING), 0, zp_Redev),
-           # Do parcels rezoned for fourplexes retain original zoning indicator? Check with Josh & James
-           zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2), 
-           zp_RH3_RM1 = if_else(!is.na(ZONING), 0, zp_RH3_RM1),
-           zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING), # Tool only permits user to define form-based rezonings
-                                       1,
-                                       0),
-           zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0), # perhaps 
-           
-           # Extract height from zoning name
-           height = as.numeric(str_extract(ZONING, "\\d+")),
-           height = height_setter(ZONING, height, ex_height2024),
-           height_deduction = if_else(height <= 50, 10, 15),
-           n_floors_residential = (height - height_deduction) %/% 10,
-           
-           # Lot coverage discount -> affects Envelope_1000
-           lot_coverage_discount = if_else(ACRES > 1, .55, .75),
-           #lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
-
-           # Envelope_1000
-           ground_floor = (ACRES * 43560) * lot_coverage_discount,
-           Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000, # I assume Envelope_1000 includes non-res ground floor. Check.
-           Envelope_1000_new = pmin(Envelope_1000_new, max_envelope), # Avoid outliers. Check.
-           n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
-                                          pmin(n_floors_residential, 12), 
-                                          n_floors_residential),
-           
-           # Assumes that Envelope_1000 is strictly larger than Theoretical Zoned Capacity on pg 43-45 of Appendix B
-           expected_built_envelope = case_when(
-             height <= 85 ~ ground_floor * n_floors_residential,
-             height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
-             height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
-             TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
-           ),
-           expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
-           
-           # Is it 850 square feet everywhere? Check.
-           expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
-           
-           # no downzoning allowed
-           existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
-           Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
-           Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-           expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev),
-           
-
-
+      # Update zoning indicators for blue sky regression
+      zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
+      zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
+      zp_Public = if_else(!is.na(ZONING), 0, zp_Public),
+      zp_Redev = if_else(!is.na(ZONING), 0, zp_Redev),
+      # Do parcels rezoned for fourplexes retain original zoning indicator? Check with Josh & James
+      zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2), 
+      zp_RH3_RM1 = if_else(!is.na(ZONING), 0, zp_RH3_RM1),
+      zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING), # Tool only permits user to define form-based rezonings
+                                  1,
+                                  0),
+      zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0), # perhaps 
+      
+      # Extract height from zoning name
+      height = as.numeric(str_extract(ZONING, "\\d+")),
+      height = height_setter(ZONING, height, ex_height2024),
+      height_deduction = if_else(height <= 50, 10, 15),
+      n_floors_residential = (height - height_deduction) %/% 10,
+      
+      # Lot coverage discount -> affects Envelope_1000
+      lot_coverage_discount = if_else(ACRES > 1, .55, .75),
+      #lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
+      
+      # Envelope_1000
+      ground_floor = (ACRES * 43560) * lot_coverage_discount,
+      Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000, # I assume Envelope_1000 includes non-res ground floor. Check.
+      Envelope_1000_new = pmin(Envelope_1000_new, max_envelope), # Avoid outliers. Check.
+      n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
+                                     pmin(n_floors_residential, 12), 
+                                     n_floors_residential),
+      
+      # Assumes that Envelope_1000 is strictly larger than Theoretical Zoned Capacity on pg 43-45 of Appendix B
+      expected_built_envelope = case_when(
+        height <= 85 ~ ground_floor * n_floors_residential,
+        height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
+        height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
+        TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
+      ),
+      expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
+      
+      # Is it 850 square feet everywhere? Check.
+      expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
+      
+      # no downzoning allowed
+      existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
+      Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
+      Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
+      expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev),
+      
+      
+      
     )
   
   if (!scenario %in% c('A', 'B', 'C', 'D', 'E')) {
@@ -425,7 +425,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
       expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * (1 + .4 * .6), expected_units_if_dev)
     )
   }
-
+  
   predictions.16 <- predict(model, newdata = df, type = "response")
   
   df <- df %>%
@@ -453,14 +453,14 @@ update_df <- cmpfun(update_df_)
 generate_plot <- function() {
   mapboxer(maxBounds = c(c(-122.62473, 37.65792), c(-122.26922, 37.85880)),
            center = c((-122.62473 - 122.26922)/2, (37.65792 + 37.85880)/2),
-             attributionControl = FALSE,
-             style = basemaps$Carto$positron,
-             maxZoom = 16,
-             minZoom = 9,
-             zoom = 11.1
-    ) %>%
-      add_source(df_mapbox, id='parcels_source') %>%
-      add_layer(style=fill_style, popup='APN: {{mapblklot}}')
+           attributionControl = FALSE,
+           style = basemaps$Carto$positron,
+           maxZoom = 16,
+           minZoom = 9,
+           zoom = 11.1
+  ) %>%
+    add_source(df_mapbox, id='parcels_source') %>%
+    add_layer(style=fill_style, popup='APN: {{mapblklot}}')
 }
 
 calculate_shortfall <- function(df) {
@@ -535,7 +535,7 @@ server <- function(input, output, session) {
     print('updating map')
     print(input$map)
     df <- updatedData()  # Get the updated data
-
+    
     # Group by
     df['block'] <- str_sub(df$mapblklot, 1, 4)
     df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
@@ -554,9 +554,9 @@ server <- function(input, output, session) {
       print(paste0('Group by took: ', round(Sys.time() - start, 1)))
       start <- Sys.time() 
       new_map <- do.call(set_filter,
-              list(map = mapboxer_proxy("mainPlot"),
-                   layer_id = LAYER_ID,
-                   filter = c(list('in', 'mapblklot'), apns)))
+                         list(map = mapboxer_proxy("mainPlot"),
+                              layer_id = LAYER_ID,
+                              filter = c(list('in', 'mapblklot'), apns)))
       # Find most common color and make it the default
       print(paste('nrow to plot', nrow(to_plot)))
       default_color <- names(which.max(table(pal(to_plot$n_stories))))
@@ -564,10 +564,10 @@ server <- function(input, output, session) {
       print(paste('nrow_tocolor', nrow(to_color)))
       
       apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
-                             to_color$mapblklot, 
-                             pal(to_color$n_stories), 
-                             SIMPLIFY = F)))
-
+                                           to_color$mapblklot, 
+                                           pal(to_color$n_stories), 
+                                           SIMPLIFY = F)))
+      
       if (is.null(apn_to_color)) {
         arg_list <- list(new_map,
                          layer_id=LAYER_ID, 
@@ -587,12 +587,12 @@ server <- function(input, output, session) {
       # mapboxer_proxy("map") %>%
       #   set_paint_property(layer_id = LAYER_ID,
       #                      property = 'fill_color',
-                           # value = list('match',
-                           #              list('get', 'mapblklot'),
-                           #              '4304002', 'red',
-                           #              '7284001', 'green',
-                           #              'black')) %>%
- 
+      # value = list('match',
+      #              list('get', 'mapblklot'),
+      #              '4304002', 'red',
+      #              '7284001', 'green',
+      #              'black')) %>%
+      
       print(paste0('Render took: ', round(Sys.time() - start, 1)))
       
       
@@ -603,7 +603,7 @@ server <- function(input, output, session) {
       to_plot$missing_potential <- to_plot$expected_units_skyscraper - to_plot$expected_units
       to_plot$missing_potential <- pmax(to_plot$missing_potential, 0, na.rm=T) / to_plot$ACRES
       to_plot$missing_potential <- log10(1 + to_plot$missing_potential)
-
+      
       
       # Example usage
       pal_pot <- customColorNumeric(
@@ -613,11 +613,11 @@ server <- function(input, output, session) {
       
       apns <- unique(to_plot$mapblklot)
       new_map <- do.call(set_filter,
-              list(map = mapboxer_proxy("mainPlot"),
-                   layer_id = LAYER_ID,
-                   filter = c(list('in', 'mapblklot'), apns)))
+                         list(map = mapboxer_proxy("mainPlot"),
+                              layer_id = LAYER_ID,
+                              filter = c(list('in', 'mapblklot'), apns)))
       to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$missing_potential >= 1),]
-
+      
       apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
                                            to_plot$mapblklot, 
                                            pal_pot(to_plot$missing_potential), 
@@ -663,7 +663,7 @@ server <- function(input, output, session) {
                                pal_eu(0)))
       do.call(set_paint_property, arg_list) %>%
         update_mapboxer()
-
+      
     } else if (input$map == 'sim') {
       to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
       simulate_buildout(to_plot)
@@ -824,11 +824,11 @@ server <- function(input, output, session) {
       if (!is.null(english) && english != '') {
         return(paste(c(as_n_stories(item$new_height_description), 
                        english),
-                collapse=", "))
+                     collapse=", "))
       } else {
         return(paste0(as_n_stories(item$new_height_description), ' everywhere.'))
       }
-     
+      
     }
     )
     
@@ -896,10 +896,10 @@ server <- function(input, output, session) {
     }
     
     
-  
-  # Generate the HTML and JavaScript for the legend
-  HTML(paste0(
-    "<div class='map-overlay' id='legend'>Base Zoning</div>
+    
+    # Generate the HTML and JavaScript for the legend
+    HTML(paste0(
+      "<div class='map-overlay' id='legend'>Base Zoning</div>
        <script>
          document.getElementById('legend').innerHTML = '", legend_name, "'; // Clear existing legend
          var layers = ", jsonlite::toJSON(layers, auto_unbox = TRUE), ";
@@ -918,8 +918,8 @@ server <- function(input, output, session) {
            legend.appendChild(item);
          });
        </script>"
-  ))
-})
+    ))
+  })
   
   
   observeEvent(input$rezone, {
