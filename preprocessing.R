@@ -197,4 +197,12 @@ df['college_dist'] <- as.numeric(dist / 1609)
 saveRDS(df, './four_rezonings_v4.RDS')
 print(paste('All', Sys.time() - start))
 
+df <- readRDS('./four_rezonings_v6.RDS')
+df <- df %>%
+ mutate(
+   expected_units_baseline_if_dev = if_else(expected_units_baseline_if_dev > 5, 
+                                            expected_units_baseline_if_dev * (1 + .4 * .6), 
+                                            expected_units_baseline_if_dev)
+  )
+saveRDS(df, './four_rezonings_v6b.RDS')
 

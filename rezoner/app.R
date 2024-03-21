@@ -243,44 +243,53 @@ yimbycity <- function(df) {
                              nhood %in% c('Potrero Hill', 'Mission Bay'),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING)) %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .5 | transit_dist_caltrain < .5 | transit_dist_rapid_stops < .5) &
-                             !peg & !((ex_height2024 > 65) & sb330_applies) &
+    mutate(ZONING = ifelse((transit_dist_bart < .33 | transit_dist_caltrain < .33 | transit_dist_rapid_stops < .33) &
+                             !peg & !((ex_height2024 > 55) & sb330_applies) &
                              (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              is.na(ZONING) &
                              nhood %in% c('Potrero Hill', 'Mission Bay'),
-                           get_denser_zone("65' Height Allowed", ZONING),
+                           get_denser_zone("55' Height Allowed", ZONING),
                            ZONING)) %>%
     # Geary and Masonic intersection
     mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')) &
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              !((ex_height2024 > 240) & sb330_applies),
                            get_denser_zone("240' Height Allowed", ZONING),
                            ZONING)) %>%
     # Within .1 miles of parks to 55'
     mutate(ZONING = ifelse((park_dist < .1) &
                              !peg & 
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
                              !((ex_height2024 > 55) & sb330_applies),
                            get_denser_zone("55' Height Allowed", ZONING),
                            ZONING)) %>%
-    # Within .1 miles of a college, to 85
+    # Within .1 miles of a college, to 55
     mutate(ZONING = ifelse((college_dist < .1) &
                              !peg & 
-                             !((ex_height2024 > 85) & sb330_applies),
-                           get_denser_zone("85' Height Allowed", ZONING),
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             !((ex_height2024 > 55) & sb330_applies),
+                           get_denser_zone("55' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse(((stringr::str_sub(df$mapblklot, 1, 4) %in% c('3536', '2540')) | # Castro Safeway, Arden Wood
                               (df$mapblklot %in% c('1095005', '1098050', '1079025', '1539003')) |  # Inner RIchmond Kaiser Permanente
                               (df$mapblklot %in% c('1691019', '0446002', '0446003'))) & # La Playa Safeway and Marina Safeway
                              !peg & 
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             
                              !((ex_height2024 > 140) & sb330_applies),
                            get_denser_zone("140' Height Allowed", ZONING),
                            ZONING)) %>%
-    mutate(ZONING = ifelse(((df$mapblklot %in% c('1094001', '1214017', '1214008', '1214001'))) & # City center, dmv
+    mutate(ZONING = ifelse(((df$mapblklot %in% c('1094001', '1214017', '1214008', '1214001'))) & # City center, dmv , 
                              !peg & 
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             
                              !((ex_height2024 > 300) & sb330_applies),
                            get_denser_zone("300' Height Allowed", ZONING),
                            ZONING)) %>%
     mutate(ZONING = ifelse(((stringr::str_sub(df$mapblklot, 1, 5) %in% c('14380', '72555'))) & # smart final, lakeshore plaza
                              !peg & 
+                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
+                             
                              !((ex_height2024 > 85) & sb330_applies),
                            get_denser_zone("85' Height Allowed", ZONING),
                            ZONING))
@@ -354,30 +363,39 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   typical_unit_size <- 850
   
   df <- df %>%
-    mutate(zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
+    mutate(
+           # Update zoning indicators for blue sky regression
+           zp_OfficeComm = if_else(!is.na(ZONING), 0, zp_OfficeComm),
            zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
            zp_Public = if_else(!is.na(ZONING), 0, zp_Public),
            zp_Redev = if_else(!is.na(ZONING), 0, zp_Redev),
-           zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2),
+           # Do parcels rezoned for fourplexes retain original zoning indicator? Check with Josh & James
+           zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2), 
            zp_RH3_RM1 = if_else(!is.na(ZONING), 0, zp_RH3_RM1),
-           zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING),
+           zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING), # Tool only permits user to define form-based rezonings
                                        1,
                                        0),
-           zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0),
+           zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0), # perhaps 
+           
+           # Extract height from zoning name
            height = as.numeric(str_extract(ZONING, "\\d+")),
            height = height_setter(ZONING, height, ex_height2024),
-           height_deduction = if_else(height <= 50, 10, 15), #TODO: unselect
-           n_floors_residential = (height - height_deduction) %/% 10, #TODO: unselect
-           #n_floors_residential = height / 10.5, # David's code
-           lot_coverage_discount = if_else(ACRES > 1, .55, .75), #TODO: unselect
-           lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
-           #lot_coverage_discount = if_else(height > 85, .8, lot_coverage_discount), # David's code
+           height_deduction = if_else(height <= 50, 10, 15),
+           n_floors_residential = (height - height_deduction) %/% 10,
+           
+           # Lot coverage discount -> affects Envelope_1000
+           lot_coverage_discount = if_else(ACRES > 1, .55, .75),
+           #lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
+
+           # Envelope_1000
            ground_floor = (ACRES * 43560) * lot_coverage_discount,
-           Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000,
-           Envelope_1000_new = pmin(Envelope_1000_new, max_envelope),
+           Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000, # I assume Envelope_1000 includes non-res ground floor. Check.
+           Envelope_1000_new = pmin(Envelope_1000_new, max_envelope), # Avoid outliers. Check.
            n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
                                           pmin(n_floors_residential, 12), 
                                           n_floors_residential),
+           
+           # Assumes that Envelope_1000 is strictly larger than Theoretical Zoned Capacity on pg 43-45 of Appendix B
            expected_built_envelope = case_when(
              height <= 85 ~ ground_floor * n_floors_residential,
              height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
@@ -385,24 +403,29 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
              TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
            ),
            expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
+           
+           # Is it 850 square feet everywhere? Check.
            expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
+           
            # no downzoning allowed
            existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
            Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
            Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-           expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
+           expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev),
+           
+
 
     )
   
-  if (scenario == 'A' | scenario == 'B' | scenario == 'C') { # This is another change from Rmd
-    print("dont allow E[U|D] to exceed sf planninig's claim")
-    df <- df %>%
-      mutate(MAXDENS = abs(MAXDENS),
-             du_allowed = ACRES * MAXDENS,
-             expected_units_if_dev = ifelse((!is.na(du_allowed)) & (expected_units_if_dev > du_allowed),
-                                            du_allowed, expected_units_if_dev))
+  if (!scenario %in% c('A', 'B', 'C', 'D', 'E')) {
+    # Add density bonus
+    df <- df %>% mutate(
+      Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * 1.24, Envelope_1000),
+      Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
+      expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * (1 + .4 * .6), expected_units_if_dev)
+    )
   }
-  
+
   predictions.16 <- predict(model, newdata = df, type = "response")
   
   df <- df %>%
@@ -429,11 +452,12 @@ update_df <- cmpfun(update_df_)
 
 generate_plot <- function() {
   mapboxer(maxBounds = c(c(-122.62473, 37.65792), c(-122.26922, 37.85880)),
+           center = c((-122.62473 - 122.26922)/2, (37.65792 + 37.85880)/2),
              attributionControl = FALSE,
              style = basemaps$Carto$positron,
              maxZoom = 16,
              minZoom = 9,
-             zoom = 9
+             zoom = 11.1
     ) %>%
       add_source(df_mapbox, id='parcels_source') %>%
       add_layer(style=fill_style, popup='APN: {{mapblklot}}')
@@ -683,14 +707,14 @@ server <- function(input, output, session) {
         trailWidth: 1,
         easing: "easeInOut",
         duration: 2000,
-        svgStyle: {width: "50%", height: "100%", transform: "translate(50%, 0%)",},
+        svgStyle: {width: "100%", height: "150", transform: "translate(0%, 0%)",},
         text: { 
               position: "absolute",
               left: "50%",
               top: "75%",
               padding: "0",
               margin: "0",
-              transform: "translate(-50%, 25%)",
+              transform: "translate(-100%, -100%)",
         },
         from: {color: "#FFEA82"},
         to: {color: "#ED6A5A"},
@@ -732,7 +756,7 @@ server <- function(input, output, session) {
     }
     print(added_capacity)
     updated_help <- paste0(
-      "In ", input$years_slider," years, this ", ifelse((added_capacity > 36282), 'amazing ', ''), "rezoning proposal helped build ",
+      "<br>In ", input$years_slider," years, this ", ifelse((added_capacity > 36282), 'amazing ', ''), "rezoning proposal helped build ",
       formatC(added_capacity, format="f", big.mark=",", digits=0),
       " "
     )
@@ -757,10 +781,10 @@ server <- function(input, output, session) {
     }
     
     if (added_capacity > 36282) {
-      result <-  tags$div(HTML(updated_help, congrats), style="font-size: 1.25em;")
+      result <-  tags$div(HTML(updated_help, congrats), style="font-size: 1.15em;")
       shinyjs::runjs("sprayConfetti();") # Make sure this JS function is defined
     } else {
-      result <-  tags$div(HTML(updated_help, sad), style="font-size: 1.25em;")
+      result <-  tags$div(HTML(updated_help, sad), style="font-size: 1.15em;")
     }
     
     return(result)
@@ -853,7 +877,11 @@ server <- function(input, output, session) {
                   '#21908C',
                   '#5DC863',
                   '#FDE725')
-      legend_name <- 'Base Zoning'
+      if (input$scenario %in% c('A', 'B', 'C', 'D', 'E')) {
+        legend_name <- 'Zoning + Bonus'
+      } else {
+        legend_name <- 'Base Zoning'
+      }
     } else if (input$map == "potential") { # Potential
       # Default or other conditions
       legend_name <- 'Potential'
@@ -897,7 +925,7 @@ server <- function(input, output, session) {
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
-    new_expr <- paste0('TRUE & !((ex_height2024 > ', new_height, ') & sb330_applies)')
+    new_expr <- paste0('TRUE & !((ex_height2024 >= ', new_height, ') & sb330_applies)')
     for (prefix in requirements$ids) {
       to_add <- NULL
       parcel_filter <- input[[paste0(prefix, '-parcel_filter')]]
@@ -909,7 +937,7 @@ server <- function(input, output, session) {
       }
       else if (parcel_filter == 'Economic Opportunity') {
         econ_threshold <- input[[paste0(prefix, '-economic_score')]]
-        to_add <- paste0('(econ_affh > ', as.numeric(econ_threshold) / 100, ')')
+        to_add <- paste0('(econ_affh >= ', as.numeric(econ_threshold) / 100, ')')
       }
       else if (parcel_filter == 'TCAC') {
         threshold <- input[[paste0(prefix, '-affh_score')]]
@@ -928,40 +956,40 @@ server <- function(input, output, session) {
         relevant_transit <- input[[paste0(prefix, '-transit_options')]]
         conditions <- c()
         if('Caltrain Stops' %in% relevant_transit) {
-          conditions <- c(conditions, paste0('(transit_dist_caltrain < ', distance, ')'))
+          conditions <- c(conditions, paste0('(transit_dist_caltrain <= ', distance, ')'))
         }
         
         if('BART Stops' %in% relevant_transit) {
-          conditions <- c(conditions, paste0('(transit_dist_bart < ', distance, ')'))
+          conditions <- c(conditions, paste0('(transit_dist_bart <= ', distance, ')'))
         }
         
         if('Muni Rapid Network' %in% relevant_transit) {
-          conditions <- c(conditions, paste0('(transit_dist_rapid_stops < ', distance, ')'))
+          conditions <- c(conditions, paste0('(transit_dist_rapid_stops <= ', distance, ')'))
         }
         if('All Muni Lines' %in% relevant_transit) {
-          conditions <- c(conditions, paste0('(transit_dist < ', distance, ')'))
+          conditions <- c(conditions, paste0('(transit_dist <= ', distance, ')'))
         }
         to_add <- paste0('(', paste(conditions, collapse = ' | '), ')')
       }
       else if (parcel_filter == 'Rapid Bus Line') {
         distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(transit_dist_rapid < ', distance, ')')
+        to_add <- paste0('(transit_dist_rapid <= ', distance, ')')
       }
       else if (parcel_filter == 'Commercial Corridor') {
         distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(commercial_dist < ', as.numeric(distance), ')')
+        to_add <- paste0('(commercial_dist <= ', as.numeric(distance), ')')
       }
       else if (parcel_filter == 'Parks') {
         distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(park_dist < ', as.numeric(distance), ')')
+        to_add <- paste0('(park_dist <= ', as.numeric(distance), ')')
       }
       else if (parcel_filter == 'Colleges') {
         distance <- input[[paste0(prefix, '-distance')]]
-        to_add <- paste0('(college_dist < ', as.numeric(distance), ')')
+        to_add <- paste0('(college_dist <= ', as.numeric(distance), ')')
       }
       else if (parcel_filter == 'Lot Size') {
         sqft_lot_size <- input[[paste0(prefix, '-lot_size')]]
-        to_add <- paste0('(ACRES > ', as.numeric(sqft_lot_size) / 43560, ')')
+        to_add <- paste0('(ACRES >= ', as.numeric(sqft_lot_size) / 43560, ')')
       }
       else if (parcel_filter == 'Neighborhood') {
         nhood <- input[[paste0(prefix, '-hood')]]

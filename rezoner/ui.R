@@ -44,12 +44,12 @@ ui <- fluidPage(
                     choices = c('Select' = 'blank',
                                 "Current SF Planning Proposal" = "E",
                                 "Fall 2023 SF Planning Proposal" = "D",
-                                "Housing Element Rezoning A" = "A",
-                                "Housing Element Rezoning B" = "B",
-                                "Housing Element Rezoning C" = "C",
-                                "Draft SF YIMBY Plan - No Decontrol in RH" = "yimby1", 
-                                "Draft SF YIMBY Plan - Decontrol in RH" = "yimby2",
-                                "Draft SF YIMBY Plan v2 - Decontrol in RH" = "yimby3"),
+                                #"Housing Element Rezoning A" = "A",
+                                #"Housing Element Rezoning B" = "B",
+                                #"Housing Element Rezoning C" = "C",
+                                #"Draft SF YIMBY Plan - No Decontrol in RH" = "yimby1", 
+                                #"Draft SF YIMBY Plan - Decontrol in RH" = "yimby2",
+                                "The People's Plan" = "yimby3"),
                     selected = 'blank'),
 
         tags$style(type = "text/css", ".irs-grid-pol.small {height: 0px;}"),
@@ -135,6 +135,9 @@ ui <- fluidPage(
           input#years_slider {
             background-color: #f7f7f7;
           }
+          #sortable {
+             background-color: #f7f7f7;
+          }
         ")),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
         
@@ -212,6 +215,8 @@ ui <- fluidPage(
           condition = "input.map == 'sim'",
           actionButton("resimulateBtn", "Resimulate")
         ),
+        uiOutput("dynamicEmailButton"),
+        
         # plotlyOutput("pieChart"),
         position = "bottom-left"
       ),
@@ -257,13 +262,12 @@ ui <- fluidPage(
         )),
         div(style = "position: relative;",
             uiOutput("dynamicLegend"),
-            mapboxerOutput("mainPlot", height = "600px"),
+            mapboxerOutput("mainPlot", height = "525px"),
         ),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
-        HTML('<br> </br>'),
         uiOutput("helpText"),
         position = "top-right",
-        height = "600px"
+        height = "525px"
       )
     ),
     tags$script(HTML("
