@@ -921,6 +921,101 @@ server <- function(input, output, session) {
     ))
   })
   
+  shortfallValue <- reactive({
+    round(calculate_shortfall(df = updatedData()))
+  })
+  
+  output$dynamicEmailButton <- renderUI({
+    if(shortfallValue() >= 36282 && !emailSent()) {
+      return(
+        tagList(
+          h4("Make it law"),
+          HTML('Ask SF Planning to consider this rezoning'),
+          actionButton("sendEmailBtn", "Email SF Planning")
+       )
+      )
+    }
+    if (emailSent()) {
+      return(
+        tagList(
+          h4("Make it law"),
+          HTML('Your email has been sent. Way to help SF solve its housing crisis!')
+       )
+      )
+    }
+  })
+  
+  emailSent <- reactiveVal(FALSE)
+  
+  
+  observeEvent(input$sendEmailBtn, {
+    emailSent(TRUE)
+    
+    sendEmailMod()
+  })
+  
+  sendEmailMod <- function(email = "sdamerdji1@gmail.com",
+                           cc = 'sfyimby@yimbyaction.org',
+                           mail_message = "Hello",
+                           users_name = 'Salim'){
+    
+    api_key_path <- "~/.mailgun_api_key.txt"
+    api_key <- readLines(api_key_path, warn = FALSE)
+    
+    scenario_full_name <- NULL
+    if (input$scenario %in% c('yimby3', 'E', 'D')) {
+      if (input$scenario == 'yimby3') {
+        scenario_full_name <- " the People's Plan rezoning"
+      } else if (input$scenario == 'E') {
+        scenario_full_name <- " SF Planning's current rezoning proposal"
+      } else if (input$scenario == 'D') {
+        scenario_full_name <- " SF Planning's Fall rezoning proposal"
+      }
+    }
+    
+    plain_english_user_rezonings <- sapply(user_rezoning$lists, function(item) {
+      english <- convert_logical_expression_to_english(item$new_expr)
+      if (!is.null(english) && english != '') {
+        return(paste(c(as_n_stories(item$new_height_description), 
+                       english),
+                     collapse=", "))
+      } else {
+        return(paste0(as_n_stories(item$new_height_description), ' everywhere.'))
+    }})
+    append_to_scenario <- NULL
+    if (input$scenario %in% c('yimby3', 'E', 'D') && length(user_rezoning$lists) > 0) {
+      append_to_scenario <- paste(" and adding to it the following:", plain_english_user_rezonings)
+    }
+    else if (length(user_rezoning$lists) > 0) {
+      append_to_scenario <- paste(plain_english_user_rezonings, sep='\n')
+    }
+    url <- "https://api.mailgun.net/v3/sandbox0564dfdfeda447719eb2fcfdf7e45199.mailgun.org/messages"
+    text = paste(
+      'Dear Planning Commissioners,',
+      paste0(paste0('For the Expanding Housing Opportunity rezoning, I support', scenario_full_name),
+             ifelse(!is.null(append_to_scenario), paste0(':\n', append_to_scenario), '.')),
+      'Thank you,',
+      users_name,
+      sep='\n'
+    )
+    print(text)
+    the_body <-
+      list(
+        from="Mailgun Sandbox <postmaster@sandbox0564dfdfeda447719eb2fcfdf7e45199.mailgun.org>",
+        to=email,
+        cc=cc,
+        subject="[Test Email] Expanding Housing Opportunity",
+        text=mail_message
+      )
+    #req <- httr::POST(url,
+    #                  httr::authenticate("api", api_key),
+    #                  encode = "form",
+    #                  body = the_body)
+    
+    #httr::stop_for_status(req)
+    
+    TRUE
+  }
   
   observeEvent(input$rezone, {
     new_height <- 5 + 10*input$stories
