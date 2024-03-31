@@ -266,6 +266,9 @@ ui <- fluidPage(
         ),
         uiOutput("customHtmlJs"), # Placeholder for custom HTML and JS
         uiOutput("helpText"),
+        HTML('<br>Superuser output:</br>'),
+        span(verbatimTextOutput("supervisors"), style = "color:red; font-size:20px"),
+        span(verbatimTextOutput("most_units"), style = "color:red; font-size:20px"),
         position = "top-right",
         height = "525px"
       )
