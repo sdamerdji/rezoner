@@ -20,6 +20,10 @@ map5 <- st_transform(map5, st_crs(map4))
 fourplex <- st_read('~/Desktop/rezoner2/fourplex_areas_12_2023.geojson')
 fourplex <- st_transform(fourplex, st_crs(map4))
 
+corner <- st_read('~/Desktop/rezoner2/Parcels_Corner.geojson')
+corner <- st_transform(corner, st_crs(map4))
+
+
 map4 <- map4 %>%
   mutate(M4_ZONING = ifelse(grepl("Unchanged", HeightText), NA, HeightText)) %>%
   rename(M4_height = HeightInteger) %>%
@@ -119,7 +123,7 @@ final <- rbind(merge1, merge2) #, merge3) #, merge4)
 #final <- plyr::rbind.fill(merge3, final)
 
 # Incorporate fourplex zoning to Fall 2023 rezoning dataset
-fourplex_description <- "Increased density up to four units (six units on corner lots)"
+fourplex_description <- "Increased density up to four units"
 intersections <- st_join(final[is.na(final$M4_ZONING),], fourplex, left=F)
 final$M4_ZONING[
   (final$mapblklot %in% intersections$mapblklot) 
@@ -144,9 +148,15 @@ final[is.na(final$M3_ZONING)
       "M3_ZONING"] <- fourplex_description
 
 
-final <- st_sf(final)
-#st_write(final, "~/Desktop/rezoner2/four_rezonings.geojson")
-final <- st_transform(final[1:nrow(final),], crs = 4326)
-st_write_feather(final, "~/Desktop/rezoner2/five_rezonings.feather")
-#df <- st_read_feather("~/Desktop/rezoner2/rezoner/four_rezonings.feather")
+sixplex_description <-  "Increased density up to six units"
+final[!is.na(final$M1_ZONING) & final$M1_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M1_ZONING'] <- sixplex_description
+final[!is.na(final$M2_ZONING) & final$M2_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M2_ZONING'] <- sixplex_description
+final[!is.na(final$M3_ZONING) & final$M3_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M3_ZONING'] <- sixplex_description
+final[!is.na(final$M4_ZONING) & final$M4_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M4_ZONING'] <- sixplex_description
+final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M5_ZONING'] <- sixplex_description
 
+
+
+final <- st_sf(final)
+final <- st_transform(final[1:nrow(final),], crs = 4326)
+saveRDS(final, '~/Desktop/rezoner2/five_rezonings.RDS')
