@@ -19,7 +19,7 @@ to_plot <- df[df$ACRES > 0.0023 * 10,] # To allow geometry simplifications for a
 
 simple_df <- ms_simplify(to_plot, keep_shapes=T, keep=0.042) #0.0495)
 slim_df <- dplyr::select(simple_df, mapblklot, geometry)
-df_mapbox <-  as_mapbox_source(slim_df, tolerance=.475) # only works if sf loaded
+df_mapbox <-  as_mapbox_source(slim_df, tolerance=.4) # only works if sf loaded
 
 file.remove('df_less_precise.feather')
 file.remove('df_less_precise.RDS')
