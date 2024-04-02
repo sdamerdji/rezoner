@@ -8,8 +8,9 @@ library(caret)
 library(sf)
 library(sfarrow)
 
+setwd('~/Desktop/rezoner/rezoner')
 ######### Create a dataset for the Fall 2023 rezoning #############
-map4 <- st_read('~/Desktop/rezoner2/Fall2023Rezoning.json', promote_to_multi=F)
+map4 <- st_read('~/Desktop/rezoner/Fall2023Rezoning.json', promote_to_multi=F)
 map5 <- st_read('../rezone_sites_1_2024.geojson', promote_to_multi=F)
 map5 <- st_transform(map5, st_crs(map4))
 
@@ -17,10 +18,10 @@ map5 <- st_transform(map5, st_crs(map4))
 
 # The above dataset lacks info on the fourplex rezoning, so I have to separately
 # load the block-level dataset on where fourplexes are allowed now.
-fourplex <- st_read('~/Desktop/rezoner2/fourplex_areas_12_2023.geojson')
+fourplex <- st_read('~/Desktop/rezoner/fourplex_areas_12_2023.geojson')
 fourplex <- st_transform(fourplex, st_crs(map4))
 
-corner <- st_read('~/Desktop/rezoner2/Parcels_Corner.geojson')
+corner <- st_read('~/Desktop/rezoner/data/Parcels_Corner.geojson')
 corner <- st_transform(corner, st_crs(map4))
 
 
@@ -57,14 +58,14 @@ new_map <- new_map %>%
 
 
 ######### Load and clean sites inventory dataset #############
-sf_sites_inventory <- read_excel("~/Desktop/rezoner2/sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
+sf_sites_inventory <- read_excel("~/Desktop/rezoner/sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
                                  sheet = "Table B -Submitted-Dec-22", 
                                  skip=1, 
                                  na='n/a')
 # I need a spatial join to merge the Fall 2023 dataset with the sites inventory 
 # dataset. Hence, I'm first joining the sites inventory with a geospatial 
 # bluesky dataset.
-sf_history <- st_read('~/Desktop/rezoner2/geobluesky.geojson')
+sf_history <- readRDS('~/Desktop/rezoner/data/geobluesky.RDS')
 sf_history <- st_transform(sf_history, crs=st_crs(map4))
 
 # Clean and join
@@ -135,6 +136,9 @@ final$M5_ZONING[
   & is.na(final$M5_ZONING)
 ] <- fourplex_description
 
+fourOrSixPlex = 'Increased density up to four units (six units on corner lots)'
+final[!is.na(final$M1_ZONING) & final$M1_ZONING == fourOrSixPlex, 'M1_ZONING'] <- fourplex_description
+
 # In sites inventory maps, where zoning is NA, indicate it's
 # fourplex if it's fourplex in Fall 2023 rezoning
 final[is.na(final$M1_ZONING) 
@@ -159,4 +163,4 @@ final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$
 
 final <- st_sf(final)
 final <- st_transform(final[1:nrow(final),], crs = 4326)
-saveRDS(final, '~/Desktop/rezoner2/five_rezonings.RDS')
+saveRDS(final, '~/Desktop/rezoner/five_rezonings.RDS')

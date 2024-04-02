@@ -24,16 +24,15 @@ pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), palette = "viridis", right = 
 options(shiny.fullstacktrace=TRUE)
 LAYER_ID = 'parcels_id'
 
-#df <- st_read_feather('./four_rezonings_v5.feather')
-#df <- readRDS('./four_rezonings_v5.RDS')
-#saveRDS(st_drop_geometry(df), './four_rezonings_v6.RDS')
-df <- readRDS('./four_rezonings_v6.RDS')
+df <- readRDS('./five_rezonings_nongeo.RDS')
 df_mapbox <- readRDS('./sf_map.RDS')
 
 
 # Years after rezoning
-max_envelope <- max(df$Envelope_1000)
-fourplex <- "Increased density up to four units (six units on corner lots)"
+max_envelope <- max(df$Envelope_1000) * 1.24
+fourplex <- 'Increased density up to four units'
+sixplex <- 'Increased density up to six units'
+density_restricted <- c(fourplex, sixplex)
 decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
 parisian_height <- 75
@@ -47,7 +46,7 @@ fill_style =
 paris <- function(df) {
   # Find all M3_ZONING with fourplex or decontrol and set to 55'
   df[(!is.na(df$ZONING)) 
-     & ((df$ZONING == fourplex) | 
+     & ((df$ZONING %in% density_restricted) | 
           (df$ZONING == decontrol) | 
           (as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height)), 'ZONING'] <- parisian
   
@@ -90,7 +89,7 @@ union_of_maxdens <- function(df) {
 
 height_setter <- function(ZONING, new_height, old_height) {
   dplyr::case_when(
-    ZONING == fourplex ~ pmax(old_height, 40),
+    ZONING %in% density_restricted ~ pmax(old_height, 40),
     ZONING == decontrol ~ pmax(old_height, 40),
     !is.na(ZONING) & !is.na(new_height) ~ new_height,
     .default = old_height
@@ -338,19 +337,18 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   }
   if (scenario == 'yimby2') {
     df <- yimbytown(df)
-    df[!is.na(df$ZONING) & (df$ZONING == fourplex), 'ZONING'] <- decontrol
+    df[!is.na(df$ZONING) & (df$ZONING %in% density_restricted), 'ZONING'] <- decontrol
     # .1 miles from rapid transit, bart, caltrain, 
     # Upzone 
   }
   if (scenario == 'yimby3') {
     df <- yimbycity(df)
-    df[!is.na(df$ZONING) & (df$ZONING == fourplex), 'ZONING'] <- decontrol
+    df[!is.na(df$ZONING) & (df$ZONING %in% density_restricted), 'ZONING'] <- decontrol
   }
   
   #squo_zoning <- df[is.na(df$ZONING),]
   #df <- df[!is.na(df$ZONING),]
-  #browser()
-  
+
   # USER REZONING
   for (list_item in user_rezonings) {
     df <- mutate(df, 
@@ -361,7 +359,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   # See page 30 of Appendix B in Scenario A for reasoning
   building_efficiency_discount <- .8
   typical_unit_size <- 850
-  
+
   df <- df %>%
     mutate(
       # Update zoning indicators for blue sky regression
@@ -369,13 +367,17 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
       zp_PDRInd = if_else(!is.na(ZONING), 0, zp_PDRInd),
       zp_Public = if_else(!is.na(ZONING), 0, zp_Public),
       zp_Redev = if_else(!is.na(ZONING), 0, zp_Redev),
-      # Do parcels rezoned for fourplexes retain original zoning indicator? Check with Josh & James
       zp_RH2 = if_else(!is.na(ZONING), 0, zp_RH2), 
-      zp_RH3_RM1 = if_else(!is.na(ZONING), 0, zp_RH3_RM1),
-      zp_FormBasedMulti = if_else(ZONING != fourplex & !is.na(ZONING), # Tool only permits user to define form-based rezonings
+      zp_RH3_RM1 = if_else(!is.na(ZONING) & (ZONING == fourplex), 1, zp_RH3_RM1),
+      zp_FormBasedMulti = if_else(!is.na(ZONING) & !(ZONING %in% density_restricted), # Tool only permits user to define form-based rezonings
                                   1,
-                                  0),
-      zp_DensRestMulti = if_else(ZONING == fourplex & !is.na(ZONING), 1, 0), # perhaps 
+                                  zp_FormBasedMulti),
+      zp_FormBasedMulti = if_else(!is.na(ZONING) & (ZONING %in% density_restricted), # Tool only permits user to define form-based rezonings
+                                  0,
+                                  zp_FormBasedMulti),
+      zp_DensRestMulti = if_else(!is.na(ZONING) & (ZONING == sixplex), 1, zp_DensRestMulti),
+      zp_DensRestMulti = if_else(!is.na(ZONING) & !(ZONING %in% density_restricted), 0, zp_DensRestMulti),
+      
       
       # Extract height from zoning name
       height = as.numeric(str_extract(ZONING, "\\d+")),
@@ -385,44 +387,57 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
       
       # Lot coverage discount -> affects Envelope_1000
       lot_coverage_discount = if_else(ACRES > 1, .55, .75),
-      #lot_coverage_discount = if_else((height > 85) & (ACRES > 1.5), .75, lot_coverage_discount), # To me, this is illogical but it's what the HE says
-      
+
       # Envelope_1000
       ground_floor = (ACRES * 43560) * lot_coverage_discount,
-      Envelope_1000_new = ground_floor * (n_floors_residential + 1) / 1000, # I assume Envelope_1000 includes non-res ground floor. Check.
-      Envelope_1000_new = pmin(Envelope_1000_new, max_envelope), # Avoid outliers. Check.
       n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
                                      pmin(n_floors_residential, 12), 
                                      n_floors_residential),
-      
-      # Assumes that Envelope_1000 is strictly larger than Theoretical Zoned Capacity on pg 43-45 of Appendix B
       expected_built_envelope = case_when(
         height <= 85 ~ ground_floor * n_floors_residential,
         height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
         height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
-        TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0) # Repl 7 with n_floors to recreate STATA
+        TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0)
       ),
+      expected_built_envelope = expected_built_envelope * building_efficiency_discount,
       expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
+      Envelope_1000_new = expected_built_envelope / 1000,
       
-      # Is it 850 square feet everywhere? Check.
-      expected_units_if_dev = expected_built_envelope * building_efficiency_discount / 850,
+      expected_units_if_dev = expected_built_envelope / typical_unit_size,
       
-      # no downzoning allowed
       existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
+      
+      # No downzoning allowed
       Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
+      
+      # Upzone ratio
       Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-      expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 6), expected_units_if_dev),
       
-      
-      
+      # Density restrictions
+      expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == fourplex, pmin(expected_units_if_dev, 4), expected_units_if_dev),
+      expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == sixplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
+
     )
-  
-  if (!scenario %in% c('A', 'B', 'C', 'D', 'E')) {
+
+  sdbl <- 1 + .4 * .6
+  if (!(scenario %in% c('A', 'B', 'C', 'D', 'E'))) {
     # Add density bonus
     df <- df %>% mutate(
-      Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * 1.24, Envelope_1000),
-      Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-      expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * (1 + .4 * .6), expected_units_if_dev)
+      Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+      Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0),
+      expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+    )
+  } else if (scenario == 'D') {
+    df <- df %>% mutate(
+      Envelope_1000 = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+      Upzone_Ratio = if_else(is.na(M4_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(is.na(!M4_ZONING), Upzone_Ratio, 0)),
+      expected_units_if_dev = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+    ) 
+    } else if (scenario == 'E') {
+      df <- df %>% mutate(
+        Envelope_1000 = if_else(is.na(M5_ZONING) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+        Upzone_Ratio = if_else(is.na(M5_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M5_ZONING), Upzone_Ratio, 0)),
+        expected_units_if_dev = if_else(is.na(M5_ZONING) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
     )
   }
   
@@ -451,12 +466,12 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
 update_df <- cmpfun(update_df_)
 
 generate_plot <- function() {
-  mapboxer(maxBounds = c(c(-122.62473, 37.65792), c(-122.26922, 37.85880)),
+  mapboxer(maxBounds = c(c(-122.5747, 37.7), c(-122.3192, 37.83)),
            center = c((-122.62473 - 122.26922)/2, (37.65792 + 37.85880)/2),
            attributionControl = FALSE,
            style = basemaps$Carto$positron,
            maxZoom = 16,
-           minZoom = 9,
+           minZoom = 10,
            zoom = 11.1
   ) %>%
     add_source(df_mapbox, id='parcels_source') %>%
@@ -540,7 +555,7 @@ server <- function(input, output, session) {
     df['block'] <- str_sub(df$mapblklot, 1, 4)
     df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
     df$n_stories <- (df$height - 5) %/% 10
-    df[!is.na(df$ZONING) & df$ZONING == fourplex & is.na(df$n_stories), 'n_stories'] <- 4
+    df[!is.na(df$ZONING) & df$ZONING %in% c(fourplex, sixplex) & is.na(df$n_stories), 'n_stories'] <- 4
     df[!is.na(df$ZONING) & df$ZONING == decontrol & is.na(df$n_stories), 'n_stories'] <- 4
     
     
@@ -809,13 +824,15 @@ server <- function(input, output, session) {
       arrange(desc(net_units)) %>%
       head(5) %>%
       select(mapblklot, ZONING, ACRES, pdev, net_units, expected_units, Envelope_1000, Upzone_Ratio)
+    
     yields <- paste0('Lot ', format(values$mapblklot),
                      " yields ", round(values$net_units),
                      ' units with P(dev) = ', round(100*values$pdev, 1), '% ',
                      'with ', values$ZONING, ' and ', round(values$ACRES, 1),
                      ' acres and ', round(values$Envelope_1000), 
                      ' envelope and upzone ratio ', round(values$Upzone_Ratio), '\n', collapse='')
-    return(paste0('Top Lots\n', yields))
+    net_units_by_zone <- st_drop_geometry(updatedData()) %>% group_by(ZONING) %>% summarise(round(sum(net_units)))
+    return(paste0(paste0('Top Lots\n', yields), paste("Zoning Summary\n", paste(net_units_by_zone$ZONING, net_units_by_zone$`round(sum(net_units))`, collapse = "\n"))))
   })
   
   observeEvent(input$add_requirement, {

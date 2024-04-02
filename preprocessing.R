@@ -1,47 +1,86 @@
 library(sf)
 library(stringr)
-library(sfarrow)
 library(dplyr)
 library(tidytransit)
-sf_use_s2(FALSE)
+library(parallel)
+library(foreach)
+library(doParallel)
+
 start <- Sys.time()
+setwd('~/Desktop/rezoner/rezoner')
+df <- readRDS('../five_rezonings.RDS')
+building_efficiency_discount <- .8
+typical_unit_size <- 850
+sf_use_s2(F)
 
-# This script takes an hour to run.
-# It may take less time if sf_use_s2(T) but then there are invalid geometries
-# Maybe crs changes can avoid sf_use_s2(F)?
+centroid_join <- function(parcels_df, auxiliary_df) {
+  init_nrows <- nrow(parcels_df)
+  centroids <- st_point_on_surface(parcels_df)
+  centroids['id'] <-  1:nrow(centroids)
+  auxiliary_df <- st_transform(auxiliary_df, st_crs(parcels_df))
+  result <- st_join(centroids, auxiliary_df, join = st_intersects) %>%
+    group_by(id) %>%
+    slice(1) %>%
+    ungroup()
+  result$geometry <- parcels_df$geometry
+  final_nrows <- nrow(result)
+  assertthat::are_equal(init_nrows, final_nrows)
+  return(dplyr::select(result, -id))
+}
 
-setwd('~/Desktop/rezoner2/rezoner')
-df <- st_read_feather('../four_rezonings_v2.feather')
+parallelize_nearest_dist <- function(parcels_df, auxiliary_df) {
+  n_cores = detectCores() - 1
+  chunks <- split(parcels_df, cut(seq_len(nrow(parcels_df)), n_cores, labels = FALSE))
+  
+  registerDoParallel(cores = n_cores)
+  
+  nearest_parallel <- function(df_chunk) {
+    dists <- sapply(1:nrow(df_chunk), function(i) {
+      nearest = st_nearest_feature(df_chunk[i, ], auxiliary_df)
+      dist = st_distance(df_chunk[i, ], auxiliary_df[nearest, ], by_element = TRUE, tolerance=0.01 * 1609)
+      as.numeric(dist / 1609) # Convert meters to miles
+    })
+    return(dists)
+  }
+  
+  result <- foreach(chunk = chunks, .combine = 'c') %dopar% {
+    nearest_parallel(chunk)
+  }
+  return(result)
+}
 
 ###### Heights ######
-heights <- st_read('../Zoning Map - Height and Bulk Districts_20240121.geojson')
+heights <- st_read('../data/Zoning Map - Height and Bulk Districts_20240121.geojson')
 heights <- select(heights, -height) %>%
   rename(ex_height2024 = gen_hght) %>%
   mutate(ex_height2024 = as.numeric(ex_height2024))
-results <- st_join(df, heights, largest=T)
+results <- centroid_join(df, heights)
+rm('heights')
 
 ##### High Opportunity Overlay #####
-equity <- st_read('../final_opp_2024_public.gpkg')
-equity_sf <- st_filter(equity, st_union(df))
+equity <- st_read('../data/final_opp_2024_public.gpkg')
+equity_sf <- st_filter(equity, st_union(results))
 high_opp <- st_union(equity_sf[equity_sf$oppcat %in% c('High Resource', 'Highest Resource'),])
 saveRDS(st_union(high_opp), './high_opp.RDS')
+rm('equity', 'equity_sf', 'high_opp')
 
 ##### AFFH Score + Economic Opportunity Score #####
-econ_opp <- st_read('../final_2023_shapefile/final_2023_public.shp')
+econ_opp <- st_read('../data/final_2023_shapefile/final_2023_public.shp')
 econ_opp <- econ_opp %>% 
   st_filter(st_union(df)) %>%
   rename(econ_affh = ecn_dmn, affh2023=oppcat) %>%
   select(econ_affh, affh2023)
-results <- st_join(results, econ_opp, largest=T)
+results <- centroid_join(results, econ_opp)
 results[is.na(results$affh2023), 'affh2023'] <- 'No data'
+rm('econ_opp', 'equity_sf')
 
 ###### Priority equity geographies ###### 
-sud <- st_read('../Zoning Map - Special Use Districts_20240122.geojson')
+sud <- st_read('../data/Zoning Map - Special Use Districts_20240122.geojson')
 peg <- sud[sud$name == 'Priority Equity Geographies Special Use District',]$geometry
 saveRDS(peg, './peg.RDS')
 results[, 'peg'] <- as.vector(st_intersects(results, peg, sparse=F))
+rm('sud', 'peg')
 
-print(Sys.time() - start)
 
 results['ZONING'] <- NA
 
@@ -57,12 +96,15 @@ results <- results %>%
 
 
 # Add a column for E[U | Baseline] and E[U | Skyscraper]
+sdbl <- 1.24
 model <- readRDS(file='./light_model.rds')
 predictions.16 <- predict(model, newdata = results, type = "response")
 # E[U | Baseline]
 results <- results %>%
   mutate(pdev_baseline_1yr = predictions.16) %>% 
-  mutate(expected_units_baseline_if_dev = Envelope_1000 * 1000 * 0.8 / 850)
+  mutate(expected_units_baseline_if_dev = if_else(Envelope_1000 * 1000 / typical_unit_size > 5,
+                                                  Envelope_1000 * sdbl * 1000 / typical_unit_size,
+                                                  Envelope_1000 * 1000 / typical_unit_size))
 
 # E[U | Skyscraper]
 skyscrapers <-  "245' Height Allowed"
@@ -79,130 +121,125 @@ temp_df <- results %>%
          zp_FormBasedMulti = 1,
          zp_DensRestMulti = 0,
          height = 245,
-         Envelope_1000_new = case_when(
-           height >= 85 ~ ((ACRES * 43560) * 0.8 * height / 10.5) / 1000,
-           ACRES >= 1 & height < 85 ~ ((ACRES * 43560) * 0.55 * height / 10.5) / 1000,
-           ACRES < 1 ~ ((ACRES * 43560) * 0.75 * height / 10.5) / 1000, # Swap lines from Rmd bc this logic matches STATA code
-           TRUE ~ NA_real_
+         height_deduction = if_else(height <= 50, 10, 15),
+         n_floors_residential = (height - height_deduction) %/% 10,
+         
+         # Lot coverage discount -> affects Envelope_1000
+         lot_coverage_discount = if_else(ACRES > 1, .55, .75),
+         
+         # Envelope_1000
+         ground_floor = (ACRES * 43560) * lot_coverage_discount,
+         n_floors_residential = if_else((ACRES * 43560 <= 12000 & (height > 85)), # Cap at 12 for towers on small lots
+                                        pmin(n_floors_residential, 12), 
+                                        n_floors_residential),
+         expected_built_envelope = case_when(
+           height <= 85 ~ ground_floor * n_floors_residential,
+           height > 85 & (ACRES * 43560 < 12000) ~ ground_floor * n_floors_residential,
+           height > 85 & (ACRES * 43560 < 45000) ~ ground_floor * 7 + 12000 * pmax(n_floors_residential - 7, 0),
+           TRUE ~ ground_floor * 7 + round(ACRES) * 12000 * pmax(n_floors_residential - 7, 0)
          ),
-         # no downzoning allowed
+         expected_built_envelope = expected_built_envelope * building_efficiency_discount,
+         expected_built_envelope = pmin(expected_built_envelope, max_envelope * 1000),
+         Envelope_1000_new = expected_built_envelope / 1000,
+
+         Envelope_1000_new = pmin(Envelope_1000_new, max_envelope), # Avoid outliers.
+         expected_units_if_dev = expected_built_envelope / typical_unit_size,
+         
          existing_sqft = if_else(Upzone_Ratio != 0, Envelope_1000 / Upzone_Ratio, 0),
+         
+         # No downzoning allowed
          Envelope_1000 = pmax(Envelope_1000_new, Envelope_1000),
-         Envelope_1000 = pmin(Envelope_1000, max_envelope),
+         
+         # Upzone ratio
          Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0), # This, to me, is wrong, but it's how Blue Sky data is coded
-         expected_units_skyscraper_if_dev = Envelope_1000 * 1000 * 0.8 / 850) # Should 0.8 this be here?
+         
+         expected_units_skyscraper_if_dev = Envelope_1000 * 1000 / 850)
+
 
 predictions.16_skyscraper <- predict(model, newdata = temp_df, type = "response")
 results[,'expected_units_skyscraper_if_dev'] <- temp_df$expected_units_skyscraper_if_dev
 results[,'pdev_skyscraper_1yr'] <- predictions.16_skyscraper
 
-print(paste('Potential', round(Sys.time() - start, 1)))
-
-##### Supervisor Breakdown #####
-supervisors <- st_read('../Supervisor Districts (2022)_20240124.geojson')
+##### Supervisor #####
+supervisors <- st_read('../data/Supervisor Districts (2022)_20240124.geojson')
 
 nrow(results)
-results2 <- st_join(results, supervisors, largest=T)
-nrow(results2)
-results2 <- select(results2, -c("sup_dist_pad", "sup_dist_num", 
+results <- centroid_join(results, supervisors)
+results <- select(results, -c("sup_dist_pad", "sup_dist_num", 
               "data_loaded_at", "sup_dist", "data_as_of"))
-points <- st_coordinates(st_centroid(results2))
-results2[, 'lng'] <- points[,1]
-results2[, 'lat'] <- points[,2]
-st_write_feather(results2, '../four_rezonings_v3.feather')
+rm('supervisors')
+gc()
+###### Lat, long for parcels #####
+points <- st_coordinates(st_centroid(results))
+results[, 'lng'] <- points[,1]
+results[, 'lat'] <- points[,2]
 
 
-###### MUNI LINES ######
-setwd('~/Desktop/rezoner2/rezoner')
-df <- st_read_feather('../four_rezonings_v3.feather')
-gtfs_obj <- read_gtfs('../google_transit.zip')
-muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(df))
+###### Transit ######
+setwd('~/Desktop/rezoner/rezoner')
+gtfs_obj <- read_gtfs('../data/google_transit.zip')
+muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(results))
+
+# All Muni lines with <15 min frequency
 uq_trips <- muni_geo$trips[!duplicated(muni_geo$trips[,c('route_id', 'shape_id')]),]
 muni <- inner_join(uq_trips, muni_geo$shapes)
-muni <- st_as_sf(muni, crs=st_crs(df))
-nearest = st_nearest_feature(df, muni)
-dist = st_distance(df, muni[nearest,], by_element=TRUE)
-df['transit_dist'] <- as.numeric(dist / 1609) # Distance to any muni line
+high_frequency_routes <- get_route_frequency(gtfs_obj) %>% arrange(median_headways) %>% filter(median_headways < 60 * 15) %>% select(route_id)
+muni <- muni[muni$route_id %in% high_frequency_routes$route_id, ]
+muni <- st_as_sf(muni, crs=st_crs(results))
+results['transit_dist'] <- parallelize_nearest_dist(results[, 'geometry'], muni)
 
 # Now just rapid muni lines
-sf_use_s2(T)
 rapid_lines <- muni[str_detect(muni$route_id, 'R$') | muni$route_id %in% c('J', 'L', 'K', 'M', 'N', 'T'),]
-nearest = st_nearest_feature(df, rapid_lines)
-dist = st_distance(df, rapid_lines[nearest,], by_element=TRUE, tolerance=10)
-df['transit_dist_rapid'] <- as.numeric(dist / 1609)
+results['transit_dist_rapid'] <- parallelize_nearest_dist(results[, 'geometry'], rapid_lines)
 
 # Now just rapid muni stops
 rapid_lines <- muni[str_detect(muni$route_id, 'R$') | muni$route_id %in% c('J', 'L', 'K', 'M', 'N', 'T'),]
 # Find stops 
 rapid_stops <- inner_join(rapid_lines, gtfs_obj$stop_times, by='trip_id')
 rapid_stop_sf <- inner_join(st_drop_geometry(rapid_stops), gtfs_obj$stops)
-rapid_stops <- st_as_sf(rapid_stop_sf, coords=c('stop_lon', 'stop_lat'), crs=st_crs(df))
-nearest = st_nearest_feature(df, rapid_stops)
-dist = st_distance(df, rapid_stops[nearest,], by_element=TRUE, tolerance=10)
-df['transit_dist_rapid_stops'] <- as.numeric(dist / 1609)
+rapid_stops <- st_as_sf(rapid_stop_sf, coords=c('stop_lon', 'stop_lat'), crs=st_crs(results))
+results['transit_dist_rapid_stops'] <- parallelize_nearest_dist(results[, 'geometry'], rapid_stops)
 
-###### BART & CALTRIAIN #######
+###### BART & Caltrain #######
 # Bart
-setwd('~/Desktop/rezoner2/rezoner')
-bart <- st_read('../BART_System_2020/BART_Station.geojson')
-nearby_stops <- bart[bart$City %in% c('San Francisco', 'Daly City'),] # Reduce compute time
-nearest = st_nearest_feature(df, nearby_stops)
-dist = st_distance(df, nearby_stops[nearest,], by_element=TRUE)
-df['transit_dist_bart'] <- as.numeric(dist / 1609)
+setwd('~/Desktop/rezoner/rezoner')
+bart <- st_read('../data/BART_System_2020/BART_Station.geojson')
+nearby_bart_stops <- bart[bart$City %in% c('San Francisco', 'Daly City'),] # Reduce compute time
+results['transit_dist_bart'] <- parallelize_nearest_dist(results[, 'geometry'], nearby_bart_stops)
+
 
 # Caltrain
-caltrain <- st_read('../Caltrain Stations and Stops.geojson')
-nearest = st_nearest_feature(df, caltrain)
-dist = st_distance(df, caltrain[nearest,], by_element=TRUE)
-df['transit_dist_caltrain'] <- as.numeric(dist / 1609)
+caltrain <- st_read('../data/Caltrain Stations and Stops.geojson')
+results['transit_dist_caltrain'] <- parallelize_nearest_dist(results[, 'geometry'], caltrain)
 
-print(paste('Transit', round(Sys.time() - start, 1)))
 
-###### COMMERCIAL CORRIDORS ###### 
-sf_use_s2(F)
-zoning <- st_read('../Zoning Map - Zoning Districts.geojson')
-commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),] #TODO: Ask Annie if correct
+###### Commercial Corridors ###### 
+zoning <- st_read('../data/Zoning Map - Zoning Districts.geojson')
+commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),]
+results['commercial_dist'] <- parallelize_nearest_dist(results[, 'geometry'], commercial_corridors)
+rm('commercial_corridors', 'zoning', 'rapid_stops', 'rapid_stop_sf', 'rapid_lines', 'bart', 'gtfs_obj')
+gc()
 
-nearest = st_nearest_feature(df, commercial_corridors)
-dist = st_distance(df, commercial_corridors[nearest,], by_element=TRUE, tolerance=10)
-df['commercial_dist'] <- as.numeric(dist / 1609)
-
-####### NEIGHBORHOODS ####### 
-sf_use_s2(T)
-hoods <- st_read('../Analysis Neighborhoods_20240202.geojson')
+####### Neighborhoods ####### 
+hoods <- st_read('../data/Analysis Neighborhoods_20240202.geojson')
 saveRDS(sort(hoods$nhood), './hoods.RDS')
-result <- st_join(df, hoods, largest=T)
+results <- centroid_join(results, hoods)
 
 
-####### PARKS ####### 
-sf_use_s2(F)
-df <- readRDS('./four_rezonings_v4.RDS')
-parks <- st_read('../Park Lands - Recreation and Parks Department.geojson')
+####### Parks ####### 
+parks <- st_read('../data/Park Lands - Recreation and Parks Department.geojson')
 parks$acres = as.numeric(parks$acres)
 parks = parks[parks$map_park_n != 'Camp Mather',]
 parks = parks[parks$acres > 1,]
-nearest = st_nearest_feature(df, parks)
-dist = st_distance(df, parks[nearest,], by_element=TRUE, tolerance=10)
-df['park_dist'] <- as.numeric(dist / 1609)
+results['park_dist'] <- parallelize_nearest_dist(results[, 'geometry'], parks)
 
-###### COLLEGES ######
-colleges <- st_read('../Schools_College_20240215.geojson')
+###### Colleges ######
+colleges <- st_read('../data/Schools_College_20240215.geojson')
 colleges = colleges[as.numeric(st_area(colleges)) / 4047 > 1,]
-nearest = st_nearest_feature(df, colleges)
-dist = st_distance(df, colleges[nearest,], by_element=TRUE, tolerance=10)
-df['college_dist'] <- as.numeric(dist / 1609)
+results['college_dist'] <- parallelize_nearest_dist(results[, 'geometry'], colleges)
 
 
-#### TRY RDS INSTEAD OF FEATHER. IT TAKES A THIRD OF THE TIME. ####
-saveRDS(df, './four_rezonings_v4.RDS')
-print(paste('All', Sys.time() - start))
+###### Save results to disk #####
+saveRDS(results, '../five_rezonings_processed.RDS')
 
-df <- readRDS('./four_rezonings_v6.RDS')
-df <- df %>%
- mutate(
-   expected_units_baseline_if_dev = if_else(expected_units_baseline_if_dev > 5, 
-                                            expected_units_baseline_if_dev * (1 + .4 * .6), 
-                                            expected_units_baseline_if_dev)
-  )
-saveRDS(df, './four_rezonings_v6b.RDS')
-
+print(Sys.time() - start)
