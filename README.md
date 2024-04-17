@@ -2,15 +2,16 @@
 
 Here is the minimal set of instructions to get the app running locally.
 
-Install (git-lfs)[https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage]
-
+Install [git-lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
 
 In the command line, run the following:
 ```
-git lfs pull
+git lfs pull --include "rezoner/light_model.rds"
+git lfs pull --include "rezoner/five_rezonings_nongeo.rds"
+git lfs pull --include "rezoner/sf_map.rds"
 ```
 
-This should download the required collateral. To run app.R, you need at minimium the files light_model.rds, five_rezonings_nongeo.RDS, sf_map.RDS
+This should download the required collateral. 
 
 In RStudio run the following commands:
 
