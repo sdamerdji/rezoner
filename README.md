@@ -2,17 +2,6 @@
 
 Here is the minimal set of instructions to get the app running locally.
 
-Install [git-lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
-
-In the command line, run the following:
-```
-git lfs pull --include "rezoner/light_model.rds"
-git lfs pull --include "rezoner/five_rezonings_nongeo.rds"
-git lfs pull --include "rezoner/sf_map.rds"
-```
-
-This should download the required collateral. 
-
 In RStudio run the following commands:
 
 ```
@@ -26,3 +15,15 @@ if (length(missing_packages) > 0) {
 ```
 
 Then in RStudio, open app.R and click 'Run App' at the top right. The app should run!
+
+
+More libraries are needed to run through the whole pipeline to re-create the pipeline that outputs light_model.rds, sf_map.rds, and five_rezonings_non_geo.rds
+
+First you'll need to install [git-lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
+
+In the command line, run the following:
+```
+git lfs pull
+```
+
+Then, after installing the relevant R packages, you'll source main.R.
