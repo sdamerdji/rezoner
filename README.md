@@ -5,7 +5,7 @@ Here is the minimal set of instructions to get the app running locally.
 In RStudio run the following commands:
 
 ```
-required_packages <- c("shiny", "dplyr", "sf", "shinyjs", "shinyBS", "mapboxer", "sortable", "shinyWidgets", "stringr", "viridis", "compiler")
+required_packages <- c("shiny", "dplyr", "sf", "shinyjs", "shinyBS", "mapboxer", "sortable", "shinyWidgets", "stringr", "viridis", "compiler", "RColorBrewer")
 missing_packages <- setdiff(required_packages, installed.packages()[, "Package"])
 
 if (length(missing_packages) > 0) {
