@@ -44,7 +44,7 @@ convert_logical_expression_to_english <- function(expression) {
       transit_name <- switch(transit_type,
                              bart = "BART",
                              caltrain = "Caltrain",
-                             rapid = "MUNI's rapid transit network",
+                             rapid_stops = "MUNI's rapid transit network",
                              'any MUNI line') # Default case
       distance_phrase <- if (negated) "not within" else "within"
       english_parts <- c(english_parts, paste(distance_phrase, distance, "miles of", transit_name))
@@ -67,7 +67,7 @@ convert_logical_expression_to_english <- function(expression) {
     } else if(grepl("college_dist", part)) {
       distance <- gsub(".*<= (0\\.\\d+)", "\\1", part)
       if (grepl('(\\(|\\))',distance)) {
-        distance <- gsub(".*< ((0\\.\\d+)|0|1)\\)", "\\1", part)
+        distance <- gsub(".*<= ((0\\.\\d+)|0|1)\\)", "\\1", part)
       }
       
       distance_phrase <- if (negated) "not within" else "within"
@@ -80,7 +80,7 @@ convert_logical_expression_to_english <- function(expression) {
       }
       
       distance_phrase <- if (negated) "not over" else "over"
-      english_parts <- c(english_parts, paste(distance_phrase, econ_affh, "economic score."))
+      english_parts <- c(english_parts, paste(distance_phrase, econ_affh, "economic score"))
     }
     else if(grepl("nhood == ", part)) {
       neighborhood <- gsub("nhood == \"(.*)\"\\)*", "\\1", part)

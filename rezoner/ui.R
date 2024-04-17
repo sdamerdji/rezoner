@@ -62,10 +62,21 @@ ui <- fluidPage(
             });
           "))
         ),
-
-        h4('Or add your own!'),
+        tags$head(
+          tags$style(HTML("
+          .shiny-input-container > label {
+            font-weight: normal !important;
+          }
+        "))
+        ),
+        uiOutput("dynamicRezoneHeader"),
         tags$style(HTML("
           input#stories {
+            background-color: #f7f7f7;
+          }
+        ")),
+        tags$style(HTML("
+          input#yourname {
             background-color: #f7f7f7;
           }
         ")),
@@ -216,7 +227,9 @@ ui <- fluidPage(
           condition = "input.map == 'sim'",
           actionButton("resimulateBtn", "Resimulate")
         ),
-        uiOutput("dynamicEmailButton"),
+        uiOutput('dynamicEmailButton1'),
+        uiOutput('dynamicEmailButton2'),
+        uiOutput('dynamicEmailButton3'),
         
         # plotlyOutput("pieChart"),
         position = "bottom-left"

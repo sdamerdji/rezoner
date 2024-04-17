@@ -430,7 +430,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   } else if (scenario == 'D') {
     df <- df %>% mutate(
       Envelope_1000 = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-      Upzone_Ratio = if_else(is.na(M4_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(is.na(!M4_ZONING), Upzone_Ratio, 0)),
+      Upzone_Ratio = if_else(is.na(M4_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M4_ZONING), Upzone_Ratio, 0)),
       expected_units_if_dev = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
     ) 
     } else if (scenario == 'E') {
@@ -460,6 +460,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
+  browser()
   return(df)
 }
 
@@ -502,7 +503,54 @@ server <- function(input, output, session) {
   
   # Update the reactive value whenever input features change
   observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists), {
-    updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists))
+    if (input$years_slider <= 10 & input$years_slider >= 5){
+      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists))
+    }
+  })
+  
+  output$dynamicRezoneHeader <- renderUI({
+    # Check if the list is empty
+    if(length(user_rezoning$lists) == 0) {
+      h4('Or add your own!')
+    } else {
+      # If not empty, select a random message
+      # messages <- c('Why not add another?\nThis city surely has got room for more', 
+      #               'Why not add another?\nThis city surely has got room for more', 
+      #               'You can rezone again\n', 
+      #               
+      #               'Now that\'s starting to look like a city.\n Why not upzone even more?')
+
+
+      if ((length(user_rezoning$lists) == 1) && ('list0' %in% names(user_rezoning$lists)) && nchar(user_rezoning$lists$list0$new_expr[1]) == 47) {
+      chosen_message <- "Or add your own!\nWhy not click 'specify where' to rezone with precision."
+      }
+      
+      else if ((length(user_rezoning$lists) == 1)) {
+        chosen_message <- 'Add another rezoning!\nWant to define another rezoning? You can create as many as you like.'
+      }
+      
+      else if ((length(user_rezoning$lists) > 1)) {
+        chosen_message <- 'Add another rezoning!\nLooks like you got the hang of it!'
+      }
+      
+      else if ((length(user_rezoning$lists) > 2)) {
+        chosen_message <- 'Nice work!\nLooks like you got the hang of it!'
+      }
+      else if ((length(user_rezoning$lists) > 3)) {
+        chosen_message <- 'Nice work!'
+      }
+      
+      
+      # Split long messages for display
+      if(nchar(chosen_message) > 30) {
+        split_point <- regexpr("\n", chosen_message)
+        part1 <- substr(chosen_message, 1, split_point[1]-1)
+        part2 <- substr(chosen_message, split_point[1]+1, nchar(chosen_message))
+        tagList(h4(part1), HTML(part2))
+      } else {
+        h4(chosen_message)
+      }
+    }
   })
   
   output$mainPlot <- renderMapboxer({
@@ -967,42 +1015,61 @@ server <- function(input, output, session) {
     round(calculate_shortfall(df = updatedData()))
   })
   
-  output$dynamicEmailButton <- renderUI({
-    if(shortfallValue() >= 36282 && !emailSent()) {
-      return(
-        tagList(
-          h4("Make it law"),
-          HTML('Ask SF Planning to consider this rezoning'),
-          actionButton("sendEmailBtn", "Email SF Planning")
-       )
-      )
+  create_mailto_link <- function(subject, body, to, cc=NULL) {
+    # Encoding special characters
+    subject_enc <- URLencode(subject)
+    body_enc <- URLencode(body)
+    to_enc <- URLencode(to)
+    
+    # Creating mailto link
+    mailto <- paste0("mailto:", to_enc, "?subject=", subject_enc, "&body=", body_enc)
+    
+    # Adding BCC if provided
+    if (!is.null(cc) && nchar(cc) > 0) {
+      bcc_enc <- URLencode(cc)
+      mailto <- paste0(mailto, "&bcc=", bcc_enc)
     }
-    if (emailSent()) {
+    cc <- paste(c("rich.hillis@sfgov.org", "joshua.switzky@sfgov.org", "rachael.tanner@sfgov.org",
+                  "lisa.chen@sfgov.org", "sue.diamond@sfgov.org", "kathrin.moore@sfgov.org", 
+                  "derek.braun@sfgov.org", "joel.koppel@sfgov.org", "board.of.supervisors@sfgov.org", "theresa.imperial@sfgov.org"), collapse = ",")
+    cc_enc <- URLencode(cc)
+    mailto <- paste0(mailto, "&cc=", cc_enc)
+    
+    return(a('Email', href=mailto))
+  }
+  
+  output$dynamicEmailButton1 <- renderUI({
+    if(shortfallValue() >= 36282) {
       return(
         tagList(
-          h4("Make it law"),
-          HTML('Your email has been sent. Way to help SF solve its housing crisis!')
+          h4("Make it law")
+
        )
       )
     }
   })
-  
-  emailSent <- reactiveVal(FALSE)
-  
-  
-  observeEvent(input$sendEmailBtn, {
-    emailSent(TRUE)
-    
-    sendEmailMod()
+  output$dynamicEmailButton2 <- renderUI({
+    if(shortfallValue() >= 36282) {
+      return(
+        tagList(
+          sendEmailMod(cc=input$subscribe),
+          HTML('SF Planning to consider this rezoning.'),
+        )
+      )
+    }
+  })
+  output$dynamicEmailButton3 <- renderUI({
+    if(shortfallValue() >= 36282) {
+      return(
+        tagList(
+          checkboxInput("subscribe", "And recieve email updates from SF YIMBY after writing in!", value = TRUE) # Adds an opt-out checkbox
+        )
+      )
+    }
   })
   
-  sendEmailMod <- function(email = "sdamerdji1@gmail.com",
-                           cc = 'sfyimby@yimbyaction.org',
-                           mail_message = "Hello",
-                           users_name = 'Salim'){
-    
-    api_key_path <- "~/.mailgun_api_key.txt"
-    api_key <- readLines(api_key_path, warn = FALSE)
+  sendEmailMod <- function(to_email = "sf.housing.choice@sfgov.org",
+                           cc=NULL){
     
     scenario_full_name <- NULL
     if (input$scenario %in% c('yimby3', 'E', 'D')) {
@@ -1029,37 +1096,63 @@ server <- function(input, output, session) {
       append_to_scenario <- paste(" and adding to it the following:", plain_english_user_rezonings)
     }
     else if (length(user_rezoning$lists) > 0) {
-      append_to_scenario <- paste(plain_english_user_rezonings, sep='\n')
+      append_to_scenario <- paste('-', paste(plain_english_user_rezonings, sep='\n'))
     }
-    url <- "https://api.mailgun.net/v3/sandbox0564dfdfeda447719eb2fcfdf7e45199.mailgun.org/messages"
+
+    if(!is.null(append_to_scenario)) {
+      output <- paste0(':', paste('\n', append_to_scenario, collapse = ''))
+    } else {
+      output <- '.'
+    }
+    
     text = paste(
-      'Dear Planning Commissioners,',
+      'Dear SF Planning,',
       paste0(paste0('For the Expanding Housing Opportunity rezoning, I support', scenario_full_name),
-             ifelse(!is.null(append_to_scenario), paste0(':\n', append_to_scenario), '.')),
-      'Thank you,',
-      users_name,
-      sep='\n'
+             output),
+      paste0('This would ensure the city met its legal housing obligations and zoned for ', shortfallValue(), ' units of housing, which would bring down the rent in the city and ease our housing shortage.'),
+      paste('Thank you,', sep='\n'),
+      sep='\n\n'
     )
-    print(text)
-    the_body <-
-      list(
-        from="Mailgun Sandbox <postmaster@sandbox0564dfdfeda447719eb2fcfdf7e45199.mailgun.org>",
-        to=email,
-        cc=cc,
-        subject="[Test Email] Expanding Housing Opportunity",
-        text=mail_message
-      )
-    #req <- httr::POST(url,
-    #                  httr::authenticate("api", api_key),
-    #                  encode = "form",
-    #                  body = the_body)
-    
-    #httr::stop_for_status(req)
-    
-    TRUE
-  }
+
+    if (!is.null(cc) && nchar(cc) > 0 && cc != FALSE){
+      cc <- 'hi@sfyimby.org'
+    } else {
+      cc <- NULL
+    }
+    create_mailto_link(subject='Expanding Housing Opportunity',
+                       body=text,
+                       to=to_email,
+                       cc=cc)
+    }
+  
+  observe({
+    # Validate 'stories' input
+    if(!is.na(input$stories ) && input$stories > 25) {
+      # Reset to default value or provide feedback to the user
+      updateNumericInput(session, "stories", value = 25)
+    }
+    if(!is.na(input$stories) && input$stories < 4) {
+      # Reset to default value or provide feedback to the user
+      updateNumericInput(session, "stories", value = 4)
+    }
+  })
+  
+  observe({
+    # Validate 'stories' input
+    if(input$years_slider > 10) {
+      # Reset to default value or provide feedback to the user
+      updateNumericInput(session, "years_slider", value = 10)
+    }
+    if(input$years_slider < 5) {
+      # Reset to default value or provide feedback to the user
+      updateNumericInput(session, "years_slider", value = 5)
+    }
+  })
   
   observeEvent(input$rezone, {
+    if (is.na(input$stories)) {
+      return(NULL)
+    }
     new_height <- 5 + 10*input$stories
     new_height_description <- paste0(new_height, "' Height Allowed")
     new_expr <- paste0('TRUE & !((ex_height2024 >= ', new_height, ') & sb330_applies)')

@@ -25,15 +25,16 @@ requirementUI <- function(id) {
                                onLabel = "in", offLabel = "not in", 
                                value = TRUE, size='mini')),
     column(8, selectInput(ns("parcel_filter"), NULL, choices = c("Transit",
+                                                                 "Neighborhood",
                                                        "Commercial Corridor", 
-                                                       "Economic Opportunity", 
+                                                       'Parks', 
+                                                       'Colleges',
+                                                       "Economic Opportunity",
                                                        "PEG",
                                                        'TCAC',
                                                        "Already Rezoned",
-                                                       "Neighborhood",
-                                                       'Lot Size', 
-                                                       'Parks', 
-                                                       'Colleges')))
+                                                       'Lot Size'
+                                                       )))
     ),
     uiOutput(ns("dynamic_slider")) # Placeholder for dynamic slider UI
     
