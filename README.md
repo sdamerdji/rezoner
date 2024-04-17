@@ -15,6 +15,8 @@ if (length(missing_packages) > 0) {
 
 ```
 
+If you have trouble installing a package, try this: install.packages('foobar_package', type='source')
+
 Then in RStudio, open app.R and click 'Run App' at the top right. The app should run!
 
 ### Reproduce collateral for web app
