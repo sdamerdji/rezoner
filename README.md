@@ -29,3 +29,12 @@ git lfs pull
 ```
 
 Then, after installing the relevant R packages, you'll source main.R.
+
+### Make changes to the web app
+
+Most of the logic in this web app occurs in update_df_() in app.R. If you want to change how the effect of rezonings are calculated, this is the function to change.
+
+If you want to define a custom rezoning with greater resolution than the UI allows, look at the function yimbycity() for a pattern to borrow. In particular, you can zone at the parcel level by using the block/lot combination of parcels, which appear in the popup when you click the parcel on the map.
+
+The web app can easily be debugged by placing the line "browser()" at a line in the code where you'd like to set a breakpoint.
+
