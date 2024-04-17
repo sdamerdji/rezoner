@@ -5,7 +5,7 @@ library(shinyjs)
 library(shinyWidgets)
 library(stringr)
 library(viridis)
-
+library(RColorBrewer)
 library(compiler)
 source('./modules.R', local=T)
 source('./ui.R', local=T)
