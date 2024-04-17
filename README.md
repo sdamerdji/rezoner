@@ -30,7 +30,7 @@ In the command line, run the following:
 git lfs pull
 ```
 
-Then, after installing the relevant R packages, you'll source main.R.
+Then, after installing the relevant R packages, you'll source main.R. Depending on how many cores your computer has, this may take over an hour to run.
 
 ### Make changes to the web app
 
