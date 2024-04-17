@@ -1,4 +1,3 @@
-library(testthat)
 
 customColorNumeric <- function(domain, n=5) {
   
@@ -137,33 +136,4 @@ as_n_stories <- function(zoning_name) {
 
  )
 
- test_that("convert_logical_expression_to_english works as expected", {
-   
-   # Hypothetical expected results, you would replace these with the actual ones
-  expected_results <- c(
-    # "within 0.25 miles of BART",
-    # "not in a PEG; in the Mission neighborhood; within 0.25 miles of Caltrain",
-    # "in a PEG; in the Outer Mission neighborhood; within 0.2 miles of MUNI's rapid transit network",
-    # "within 0.35 miles of Caltrain; within 0.35 miles of MUNI's rapid transit network; within 0.12 miles of a commercial corridor",
-    # "within 0.25 miles of Caltrain; within 0.25 miles of BART; within 0.25 miles of MUNI's rapid transit network",
-    # "not within 1 miles of BART",
-    # "within 0.04 miles of any MUNI line",
-    # "not on lots over 1.1 acres",
-    # "on lots over 0.11 acres",
-    # "not already rezoned; TCAC Map Score of at least High",
-    # "TCAC Map Score of less than Moderate",
-    # "not already rezoned",
-    # "in the Bernal Heights neighborhood; in the Castro/Upper Market neighborhood",
-    # "not in the Bernal Heights neighborhood; in the Bayview Hunters Point neighborhood; in the Castro/Upper Market neighborhood; in the Chinatown neighborhood; in the Excelsior neighborhood; in the Financial District/South Beach neighborhood; in the Glen Park neighborhood; in the Golden Gate Park neighborhood; in the Haight Ashbury neighborhood",
-    # "over 0.88 economic score.",
-    'within 0.05 miles of a commercial corridor',
-    "within 0.1 miles of BART"
-  )
-   
-   actual_results <- sapply(expressions, convert_logical_expression_to_english)
-   
-   for (i in seq_along(expressions)) {
-     expect_equal(unname(actual_results[i]), expected_results[i])
-   }
- })
- 
+

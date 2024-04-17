@@ -6,3 +6,4 @@ Fall2023Rezoning.json filter=lfs diff=lfs merge=lfs -text
 fourplex_areas_12_2023.geojson filter=lfs diff=lfs merge=lfs -text
 rezoner/four_rezonings.feather filter=lfs diff=lfs merge=lfs -text
 geobluesky.geojson filter=lfs diff=lfs merge=lfs -text
+data/geobluesky.RDS filter=lfs diff=lfs merge=lfs -text

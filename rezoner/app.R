@@ -2,10 +2,8 @@ library(shiny)
 library(dplyr)
 library(sf)
 library(shinyjs)
-library(sfarrow)
 library(shinyWidgets)
 library(stringr)
-library(RColorBrewer)
 library(viridis)
 
 library(compiler)
@@ -460,7 +458,6 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
-  browser()
   return(df)
 }
 
