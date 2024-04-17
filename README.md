@@ -1,5 +1,6 @@
 # rezoner
 
+### Run the app locally
 Here is the minimal set of instructions to get the app running locally.
 
 In RStudio run the following commands:
@@ -16,6 +17,7 @@ if (length(missing_packages) > 0) {
 
 Then in RStudio, open app.R and click 'Run App' at the top right. The app should run!
 
+### Reproduce collateral for web app
 
 More libraries are needed to run through the whole pipeline to re-create the pipeline that outputs light_model.rds, sf_map.rds, and five_rezonings_non_geo.rds
 
