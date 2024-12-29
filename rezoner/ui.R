@@ -44,6 +44,7 @@ ui <- fluidPage(
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
                                 "Current SF Planning Proposal" = "E",
+                                "Current SF Planning Proposal + decontrol 4 stories in WRN" = "F",
                                 "Fall 2023 SF Planning Proposal" = "D",
                                 #"Housing Element Rezoning A" = "A",
                                 #"Housing Element Rezoning B" = "B",
@@ -83,7 +84,10 @@ ui <- fluidPage(
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
                  HTML("Upzone to&nbsp;"),
                  numericInput("stories", label = NULL, value = 6, min = 4, max = 25),
-                 HTML("&nbsp;stories.")
+                 HTML("&nbsp;stories")
+        ),
+        tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
+                 HTML("Note that user-input upzonings include density decontrol and mapped heights stack with SDBL.")
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Specify where"),

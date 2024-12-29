@@ -319,6 +319,22 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
   if (scenario == 'E') {
     df['ZONING'] <- df$M5_ZONING
   }
+  if (scenario == 'F') {
+    df['M6_ZONING'] <- df$M5_ZONING
+    # density decontrol in HRN
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+      !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+        is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
+    
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+        !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
+      & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
+    df['ZONING'] <- df$M6_ZONING
+  }
   if (scenario == 'Union') {
     df <- union_of_maxdens(df)
     
@@ -418,7 +434,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     )
 
   sdbl <- 1 + .4 * .6
-  if (!(scenario %in% c('A', 'B', 'C', 'D', 'E'))) {
+  if (!(scenario %in% c('A', 'B', 'C', 'D', 'E', 'F'))) {
     # Add density bonus
     df <- df %>% mutate(
       Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
@@ -427,16 +443,22 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     )
   } else if (scenario == 'D') {
     df <- df %>% mutate(
-      Envelope_1000 = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-      Upzone_Ratio = if_else(is.na(M4_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M4_ZONING), Upzone_Ratio, 0)),
-      expected_units_if_dev = if_else(is.na(M4_ZONING) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+      Envelope_1000 = if_else((is.na(M4_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+      Upzone_Ratio = if_else((is.na(M4_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M4_ZONING), Upzone_Ratio, 0)),
+      expected_units_if_dev = if_else((is.na(M4_ZONING) )  & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
     ) 
     } else if (scenario == 'E') {
       df <- df %>% mutate(
-        Envelope_1000 = if_else(is.na(M5_ZONING) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-        Upzone_Ratio = if_else(is.na(M5_ZONING) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M5_ZONING), Upzone_Ratio, 0)),
-        expected_units_if_dev = if_else(is.na(M5_ZONING) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+        Envelope_1000 = if_else((is.na(M5_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+        Upzone_Ratio = if_else((is.na(M5_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M5_ZONING), Upzone_Ratio, 0)),
+        expected_units_if_dev = if_else((is.na(M5_ZONING) ) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
     )
+      } else if (scenario == 'F') {
+      df <- df %>% mutate(
+        Envelope_1000 = if_else((is.na(M6_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+        Upzone_Ratio = if_else((is.na(M6_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M6_ZONING), Upzone_Ratio, 0)),
+        expected_units_if_dev = if_else((is.na(M6_ZONING) ) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+      )
   }
   
   predictions.16 <- predict(model, newdata = df, type = "response")
@@ -457,6 +479,8 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
       net_units = pmax(expected_units - expected_units_baseline, 0)
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
+  print(df %>% group_by(ZONING) %>% summarize(round(sum(net_units)), n()))
+  
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
 }
