@@ -100,7 +100,9 @@ convert_logical_expression_to_english <- function(expression) {
     } else if(grepl('^\\(affh2023', part)) {
       extracted <- gsub(".*?((Low|Moderate|High)).*", "\\1", part)
       english_parts <- c(english_parts, if (negated) paste('TCAC Map Score of less than', extracted) else paste('TCAC Map Score of at least', extracted))
-    } else if(grepl('is.na\\(ZONING', part)) {
+    } else if(grepl('^is.na\\(ZONING', part)) {
+      english_parts <- c(english_parts, 'already rezoned')
+    }else if(grepl('^!is.na\\(ZONING', part)) {
       english_parts <- c(english_parts, 'not already rezoned')
     }
   }
