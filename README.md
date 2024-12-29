@@ -19,9 +19,11 @@ If you have trouble installing a package, try this: install.packages('foobar_pac
 
 Then in RStudio, open app.R and click 'Run App' at the top right. The app should run!
 
+You do not need to source main.R to run the webapp. Sourcing main.R is only needed to reproduce light_model.rds, sf_map.rds, and five_rezonings_nongeo.rds, but you get these for free by git cloning this repository.
+
 ### Reproduce collateral for web app
 
-More libraries are needed to run through the whole pipeline to re-create the pipeline that outputs light_model.rds, sf_map.rds, and five_rezonings_non_geo.rds
+More libraries are needed to run through the whole pipeline to re-create the pipeline that outputs light_model.rds, sf_map.rds, and five_rezonings_nongeo.rds
 
 First you'll need to install [git-lfs](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage)
 
@@ -30,7 +32,19 @@ In the command line, run the following:
 git lfs pull
 ```
 
-Then, after installing the relevant R packages, you'll source main.R.
+Then, on top of the packages installed to run app.R (see the above section), install these additional R packages:
+
+```
+required_packages <- c("readr", "tidyr", "modelr", "caret", "sfarrow", "tidytransit", "doParallel", "lwgeom")
+missing_packages <- setdiff(required_packages, installed.packages()[, "Package"])
+
+if (length(missing_packages) > 0) {
+  install.packages(missing_packages)
+}
+
+```
+
+Then, you'll source main.R. Depending on how many cores your computer has, this may take over an hour to run. 
 
 ### Make changes to the web app
 
