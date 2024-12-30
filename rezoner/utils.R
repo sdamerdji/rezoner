@@ -104,6 +104,10 @@ convert_logical_expression_to_english <- function(expression) {
       english_parts <- c(english_parts, 'already rezoned')
     }else if(grepl('^!is.na\\(ZONING', part)) {
       english_parts <- c(english_parts, 'not already rezoned')
+    }else if(grepl('^is_corner', part)) {
+      english_parts <- c(english_parts, 'on corner lot')
+    }else if(grepl('^!is_corner', part) | (negated && grepl("is_corner", part))) {
+      english_parts <- c(english_parts, 'on non-corner lot')
     }
   }
 

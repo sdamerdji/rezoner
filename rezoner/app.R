@@ -27,7 +27,7 @@ df_mapbox <- readRDS('./sf_map.RDS')
 
 
 # Years after rezoning
-max_envelope <- max(df$Envelope_1000) * 1.24
+max_envelope <- max(df$Envelope_1000)
 fourplex <- 'Increased density up to four units'
 sixplex <- 'Increased density up to six units'
 density_restricted <- c(fourplex, sixplex)
@@ -293,7 +293,7 @@ yimbycity <- function(df) {
 }
 # 1094001 - city center
 
-update_df_ <- function(scenario, n_years, user_rezonings) {
+update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
   # Given site inventory df inner joined with history 
   # Control upzoning by changing M3_ZONING before passing df in
   # Return df with fields "Expected" and "Pdev"
@@ -323,14 +323,14 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     df['M6_ZONING'] <- df$M5_ZONING
     # density decontrol in HRN
     df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+      (!df$peg) & 
       !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
     df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+      (!df$peg) & 
         is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
     
     df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+      (!df$peg) & 
         !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
       & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
     df['ZONING'] <- df$M6_ZONING
@@ -432,34 +432,16 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
       expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == sixplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
 
     )
-
   sdbl <- 1 + .4 * .6
-  if (!(scenario %in% c('A', 'B', 'C', 'D', 'E', 'F'))) {
-    # Add density bonus
-    df <- df %>% mutate(
-      Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-      Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0),
-      expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
-    )
-  } else if (scenario == 'D') {
-    df <- df %>% mutate(
-      Envelope_1000 = if_else((is.na(M4_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-      Upzone_Ratio = if_else((is.na(M4_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M4_ZONING), Upzone_Ratio, 0)),
-      expected_units_if_dev = if_else((is.na(M4_ZONING) )  & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
-    ) 
-    } else if (scenario == 'E') {
+  if (stack_sdbl) {
+      # Add density bonus
       df <- df %>% mutate(
-        Envelope_1000 = if_else((is.na(M5_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-        Upzone_Ratio = if_else((is.na(M5_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M5_ZONING), Upzone_Ratio, 0)),
-        expected_units_if_dev = if_else((is.na(M5_ZONING) ) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
-    )
-      } else if (scenario == 'F') {
-      df <- df %>% mutate(
-        Envelope_1000 = if_else((is.na(M6_ZONING) ) & expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
-        Upzone_Ratio = if_else((is.na(M6_ZONING) ) & existing_sqft > 0, Envelope_1000 / existing_sqft, if_else(!is.na(M6_ZONING), Upzone_Ratio, 0)),
-        expected_units_if_dev = if_else((is.na(M6_ZONING) ) & expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
+        Envelope_1000 = if_else(expected_units_if_dev > 5, Envelope_1000 * sdbl, Envelope_1000),
+        Upzone_Ratio = if_else(existing_sqft > 0, Envelope_1000 / existing_sqft, 0),
+        expected_units_if_dev = if_else(expected_units_if_dev > 5, expected_units_if_dev * sdbl, expected_units_if_dev)
       )
   }
+  
   
   predictions.16 <- predict(model, newdata = df, type = "response")
   
@@ -480,7 +462,7 @@ update_df_ <- function(scenario, n_years, user_rezonings) {
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(df %>% group_by(ZONING) %>% summarize(round(sum(net_units)), n()))
-  
+  print(df %>% arrange(desc(net_units)) %>% select(mapblklot, net_units, expected_built_envelope) %>% head(10))
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
 }
@@ -523,9 +505,9 @@ server <- function(input, output, session) {
   user_rezoning <- reactiveValues(lists=list())
   
   # Update the reactive value whenever input features change
-  observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists), {
+  observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl), {
     if (input$years_slider <= 10 & input$years_slider >= 5){
-      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists))
+      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl))
     }
   })
   
@@ -1185,6 +1167,9 @@ server <- function(input, output, session) {
       }
       else if (parcel_filter == 'Already Rezoned') {
         to_add <- '!is.na(ZONING)'
+      }
+      else if (parcel_filter == 'Corner Lot') {
+        to_add <- 'is_corner'
       }
       else if (parcel_filter == 'Economic Opportunity') {
         econ_threshold <- input[[paste0(prefix, '-economic_score')]]

@@ -33,7 +33,8 @@ requirementUI <- function(id) {
                                                        "PEG",
                                                        'TCAC',
                                                        "Already Rezoned",
-                                                       'Lot Size'
+                                                       'Lot Size',
+                                                       'Corner Lot'
                                                        )))
     ),
     uiOutput(ns("dynamic_slider")) # Placeholder for dynamic slider UI

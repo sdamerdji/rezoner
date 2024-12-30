@@ -44,7 +44,7 @@ ui <- fluidPage(
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
                                 "Current SF Planning Proposal" = "E",
-                                "Current SF Planning Proposal + decontrol 4 stories in WRN" = "F",
+                                "Current SF Planning Proposal + decontrol 4 stories in non-PEG" = "F",
                                 "Fall 2023 SF Planning Proposal" = "D",
                                 #"Housing Element Rezoning A" = "A",
                                 #"Housing Element Rezoning B" = "B",
@@ -87,7 +87,7 @@ ui <- fluidPage(
                  HTML("&nbsp;stories")
         ),
         tags$div(style = "display: flex; align-items: center;", # Ensure alignment of text and input box
-                 HTML("Note that user-input upzonings include density decontrol and mapped heights stack with SDBL.")
+                 HTML("Note that user-input upzonings include density decontrol.")
         ),
         uiOutput("requirements_ui"),
         actionButton("add_requirement", "Specify where"),
@@ -147,6 +147,7 @@ ui <- fluidPage(
             }
             "))
         ),
+
         tags$style(HTML("
           input#years_slider {
             background-color: #f7f7f7;
@@ -156,7 +157,12 @@ ui <- fluidPage(
           }
         ")),
         actionButton("rezone", "Rezone!", class = "glow-on-hover"),
-        
+        switchInput(
+          inputId = "stack_sdbl",
+          label = "Stack SDBL",
+          value = F, # default is TRUE
+          size = "small" 
+        ),
         uiOutput("dynamic_sort1"),  # Placeholder for dynamic content
         uiOutput('all_things_sort'),
           tags$div(
