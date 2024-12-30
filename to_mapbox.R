@@ -4,7 +4,7 @@ library(sfarrow)
 library(mapboxer)
 library(rmapshaper)
 
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 
 df <- readRDS('../five_rezonings_filtered.RDS')
 

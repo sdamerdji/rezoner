@@ -8,9 +8,9 @@ library(caret)
 library(sf)
 library(sfarrow)
 
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 ######### Create a dataset for the Fall 2023 rezoning #############
-map4 <- st_read('~/Desktop/rezoner/Fall2023Rezoning.json', promote_to_multi=F)
+map4 <- st_read('../Fall2023Rezoning.json', promote_to_multi=F)
 map5 <- st_read('../rezone_sites_1_2024.geojson', promote_to_multi=F)
 map5 <- st_transform(map5, st_crs(map4))
 
@@ -18,10 +18,10 @@ map5 <- st_transform(map5, st_crs(map4))
 
 # The above dataset lacks info on the fourplex rezoning, so I have to separately
 # load the block-level dataset on where fourplexes are allowed now.
-fourplex <- st_read('~/Desktop/rezoner/fourplex_areas_12_2023.geojson')
+fourplex <- st_read('../fourplex_areas_12_2023.geojson')
 fourplex <- st_transform(fourplex, st_crs(map4))
 
-corner <- st_read('~/Desktop/rezoner/data/Parcels_Corner.geojson')
+corner <- st_read('../data/Parcels_Corner.geojson')
 corner <- st_transform(corner, st_crs(map4))
 
 
@@ -58,14 +58,14 @@ new_map <- new_map %>%
 
 
 ######### Load and clean sites inventory dataset #############
-sf_sites_inventory <- read_excel("~/Desktop/rezoner/sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
+sf_sites_inventory <- read_excel("../sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
                                  sheet = "Table B -Submitted-Dec-22", 
                                  skip=1, 
                                  na='n/a')
 # I need a spatial join to merge the Fall 2023 dataset with the sites inventory 
 # dataset. Hence, I'm first joining the sites inventory with a geospatial 
 # bluesky dataset.
-sf_history <- readRDS('~/Desktop/rezoner/data/geobluesky.RDS')
+sf_history <- readRDS('../data/geobluesky.RDS')
 sf_history <- st_transform(sf_history, crs=st_crs(map4))
 
 # Clean and join
@@ -153,14 +153,15 @@ final[is.na(final$M3_ZONING)
 
 
 sixplex_description <-  "Increased density up to six units"
-final[!is.na(final$M1_ZONING) & final$M1_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M1_ZONING'] <- sixplex_description
-final[!is.na(final$M2_ZONING) & final$M2_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M2_ZONING'] <- sixplex_description
-final[!is.na(final$M3_ZONING) & final$M3_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M3_ZONING'] <- sixplex_description
-final[!is.na(final$M4_ZONING) & final$M4_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M4_ZONING'] <- sixplex_description
-final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$mapblklot %in% corner$mapblklot, 'M5_ZONING'] <- sixplex_description
+final['is_corner'] <- final$mapblklot %in% corner$mapblklot
+final[!is.na(final$M1_ZONING) & final$M1_ZONING == fourplex_description & final$is_corner, 'M1_ZONING'] <- sixplex_description
+final[!is.na(final$M2_ZONING) & final$M2_ZONING == fourplex_description & final$is_corner, 'M2_ZONING'] <- sixplex_description
+final[!is.na(final$M3_ZONING) & final$M3_ZONING == fourplex_description & final$is_corner, 'M3_ZONING'] <- sixplex_description
+final[!is.na(final$M4_ZONING) & final$M4_ZONING == fourplex_description & final$is_corner, 'M4_ZONING'] <- sixplex_description
+final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$is_corner, 'M5_ZONING'] <- sixplex_description
 
 
 
 final <- st_sf(final)
 final <- st_transform(final[1:nrow(final),], crs = 4326)
-saveRDS(final, '~/Desktop/rezoner/five_rezonings.RDS')
+saveRDS(final, '../five_rezonings.RDS')

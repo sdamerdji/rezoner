@@ -7,7 +7,7 @@ library(foreach)
 library(doParallel)
 
 start <- Sys.time()
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 df <- readRDS('../five_rezonings.RDS')
 building_efficiency_discount <- .8
 typical_unit_size <- 850
@@ -176,7 +176,7 @@ results[, 'lat'] <- points[,2]
 
 
 ###### Transit ######
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 gtfs_obj <- read_gtfs('../data/google_transit.zip')
 muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(results))
 
@@ -202,7 +202,7 @@ results['transit_dist_rapid_stops'] <- parallelize_nearest_dist(results[, 'geome
 
 ###### BART & Caltrain #######
 # Bart
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 bart <- st_read('../data/BART_System_2020/BART_Station.geojson')
 nearby_bart_stops <- bart[bart$City %in% c('San Francisco', 'Daly City'),] # Reduce compute time
 results['transit_dist_bart'] <- parallelize_nearest_dist(results[, 'geometry'], nearby_bart_stops)
