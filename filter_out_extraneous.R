@@ -1,7 +1,7 @@
 library(dplyr)
 library(sf)
 # Run this script from rezoner subdirectory
-setwd('~/Desktop/rezoner/rezoner')
+setwd('~/Desktop/rezoner2/rezoner')
 df <- readRDS('../five_rezonings_processed.RDS')
 tax <- st_read('../Assessor Historical Secured Property Tax Rolls_20240121.geojson')
 
@@ -10,7 +10,12 @@ parcels_to_exclude <- c('State of California Property', 'Under Water Lot')
 bad_parcels <- tax %>%
   filter((property_class_code_definition %in% parcels_to_exclude) | 
            (exemption_code_definition == 'Cemetary') | (block == '9900') |
-           (block == '0006' & lot == '001') | (block == '1300' & lot == '001'))
+           (block == '0006' & lot == '001') | (block == '1300' & lot == '001') |
+           (block == '0409' & lot == '002') | (block == '7501'))
+           
+           #(block == '1313' & lot == '016') | (block == '1461' & lot == '001') |
+           #(block == '1849' & lot == '054') | (block == '1481') |
+           #(block == '1756' & lot == '001') | (block == '7501'))
 to_exclude <- st_union(bad_parcels)
 filtered <- st_filter(df, to_exclude, .predicate=st_disjoint)
 nrow(filtered)
