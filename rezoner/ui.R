@@ -46,6 +46,8 @@ ui <- fluidPage(
                                 "Current SF Planning Proposal" = "E",
                                 "Current SF Planning Proposal + decontrol 4 stories in non-PEG" = "F",
                                 "Fall 2023 SF Planning Proposal" = "D",
+                                "Builder's Remedy (WIP)" = "BR",
+                                
                                 #"Housing Element Rezoning A" = "A",
                                 #"Housing Element Rezoning B" = "B",
                                 #"Housing Element Rezoning C" = "C",
@@ -201,7 +203,7 @@ ui <- fluidPage(
         HTML('<br></br>'),
         tags$div(style = "display: flex; align-items: center; ", # Ensure alignment of text and input box
                  HTML("Project over&nbsp;"),
-                 numericInput("years_slider", label = NULL, value = 6, min = 5, max = 10, width = '60px'),
+                 numericInput("years_slider", label = NULL, value = 5, min = 5, max = 10, width = '60px'),
                  HTML("&nbsp;years.")
         ),
         # h4("Overlays:"),

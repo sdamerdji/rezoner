@@ -319,6 +319,9 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
   if (scenario == 'E') {
     df['ZONING'] <- df$M5_ZONING
   }
+  if (scenario == 'BR') {
+    df['ZONING'] <- df$BR_ZONING
+  }
   if (scenario == 'F') {
     df['M6_ZONING'] <- df$M5_ZONING
     # density decontrol in HRN

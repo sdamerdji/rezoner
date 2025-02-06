@@ -2,7 +2,7 @@ library(dplyr)
 library(sf)
 # Run this script from rezoner subdirectory
 setwd('~/Desktop/rezoner2/rezoner')
-df <- readRDS('../five_rezonings_processed.RDS')
+df <- readRDS('../five_rezonings_processed_br.RDS')
 tax <- st_read('../Assessor Historical Secured Property Tax Rolls_20240121.geojson')
 
 parcels_to_exclude <- c('State of California Property', 'Under Water Lot')
