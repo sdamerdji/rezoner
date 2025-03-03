@@ -6,10 +6,8 @@ library(parallel)
 library(foreach)
 library(doParallel)
 
-start <- Sys.time()
-setwd('~/Desktop/rezoner2/rezoner')
-df <- readRDS('../five_rezonings.RDS')
 building_efficiency_discount <- .8
+sdbl <- 1.24
 typical_unit_size <- 850
 sf_use_s2(F)
 
@@ -49,8 +47,12 @@ parallelize_nearest_dist <- function(parcels_df, auxiliary_df) {
   return(result)
 }
 
+preprocess <- function() {
+start <- Sys.time()
+df <- readRDS(file.path(PROJECT_DIR, 'five_rezonings.RDS'))
+
 ###### Heights ######
-heights <- st_read('../data/Zoning Map - Height and Bulk Districts_20240121.geojson')
+heights <- st_read(file.path(DATA_DIR, 'Zoning Map - Height and Bulk Districts_20240121.geojson'))
 heights <- select(heights, -height) %>%
   rename(ex_height2024 = gen_hght) %>%
   mutate(ex_height2024 = as.numeric(ex_height2024))
@@ -58,26 +60,26 @@ results <- centroid_join(df, heights)
 rm('heights')
 
 ##### High Opportunity Overlay #####
-equity <- st_read('../data/final_opp_2024_public.gpkg')
+equity <- st_read(file.path(DATA_DIR, 'final_opp_2024_public.gpkg'))
 equity_sf <- st_filter(equity, st_union(results))
 high_opp <- st_union(equity_sf[equity_sf$oppcat %in% c('High Resource', 'Highest Resource'),])
-saveRDS(st_union(high_opp), './high_opp.RDS')
+saveRDS(st_union(high_opp), file.path(APP_DIR, 'high_opp.RDS'))
 rm('equity', 'equity_sf', 'high_opp')
 
 ##### AFFH Score + Economic Opportunity Score #####
-econ_opp <- st_read('../data/final_2023_shapefile/final_2023_public.shp')
+econ_opp <- st_read(file.path(DATA_DIR, 'final_2023_shapefile/final_2023_public.shp'))
 econ_opp <- econ_opp %>% 
   st_filter(st_union(df)) %>%
   rename(econ_affh = ecn_dmn, affh2023=oppcat) %>%
   select(econ_affh, affh2023)
 results <- centroid_join(results, econ_opp)
 results[is.na(results$affh2023), 'affh2023'] <- 'No data'
-rm('econ_opp', 'equity_sf')
+rm('econ_opp')
 
 ###### Priority equity geographies ###### 
-sud <- st_read('../data/Zoning Map - Special Use Districts_20240122.geojson')
+sud <- st_read(file.path(DATA_DIR, 'Zoning Map - Special Use Districts_20240122.geojson'))
 peg <- sud[sud$name == 'Priority Equity Geographies Special Use District',]$geometry
-saveRDS(peg, './peg.RDS')
+saveRDS(peg, file.path(APP_DIR, 'peg.RDS'))
 results[, 'peg'] <- as.vector(st_intersects(results, peg, sparse=F))
 rm('sud', 'peg')
 
@@ -96,8 +98,7 @@ results <- results %>%
 
 
 # Add a column for E[U | Baseline] and E[U | Skyscraper]
-sdbl <- 1.24
-model <- readRDS(file='./light_model.rds')
+model <- readRDS(file.path(APP_DIR, 'light_model.rds'))
 predictions.16 <- predict(model, newdata = results, type = "response")
 # E[U | Baseline]
 results <- results %>%
@@ -161,7 +162,7 @@ results[,'expected_units_skyscraper_if_dev'] <- temp_df$expected_units_skyscrape
 results[,'pdev_skyscraper_1yr'] <- predictions.16_skyscraper
 
 ##### Supervisor #####
-supervisors <- st_read('../data/Supervisor Districts (2022)_20240124.geojson')
+supervisors <- st_read(file.path(DATA_DIR, 'Supervisor Districts (2022)_20240124.geojson'))
 
 nrow(results)
 results <- centroid_join(results, supervisors)
@@ -176,8 +177,7 @@ results[, 'lat'] <- points[,2]
 
 
 ###### Transit ######
-setwd('~/Desktop/rezoner2/rezoner')
-gtfs_obj <- read_gtfs('../data/google_transit.zip')
+gtfs_obj <- read_gtfs(file.path(DATA_DIR, 'google_transit.zip'))
 muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(results))
 
 # All Muni lines with <15 min frequency
@@ -202,44 +202,49 @@ results['transit_dist_rapid_stops'] <- parallelize_nearest_dist(results[, 'geome
 
 ###### BART & Caltrain #######
 # Bart
-setwd('~/Desktop/rezoner2/rezoner')
-bart <- st_read('../data/BART_System_2020/BART_Station.geojson')
+bart <- st_read(file.path(DATA_DIR, 'BART_System_2020/BART_Station.geojson'))
 nearby_bart_stops <- bart[bart$City %in% c('San Francisco', 'Daly City'),] # Reduce compute time
 results['transit_dist_bart'] <- parallelize_nearest_dist(results[, 'geometry'], nearby_bart_stops)
 
 
 # Caltrain
-caltrain <- st_read('../data/Caltrain Stations and Stops.geojson')
+caltrain <- st_read(file.path(DATA_DIR, 'Caltrain Stations and Stops.geojson'))
 results['transit_dist_caltrain'] <- parallelize_nearest_dist(results[, 'geometry'], caltrain)
 
 
 ###### Commercial Corridors ###### 
-zoning <- st_read('../data/Zoning Map - Zoning Districts.geojson')
+zoning <- st_read(file.path(DATA_DIR, 'Zoning Map - Zoning Districts.geojson'))
 commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),]
 results['commercial_dist'] <- parallelize_nearest_dist(results[, 'geometry'], commercial_corridors)
 rm('commercial_corridors', 'zoning', 'rapid_stops', 'rapid_stop_sf', 'rapid_lines', 'bart', 'gtfs_obj')
 gc()
 
 ####### Neighborhoods ####### 
-hoods <- st_read('../data/Analysis Neighborhoods_20240202.geojson')
-saveRDS(sort(hoods$nhood), './hoods.RDS')
+hoods <- st_read(file.path(DATA_DIR, 'Analysis Neighborhoods_20240202.geojson'))
+saveRDS(sort(hoods$nhood), file.path(APP_DIR, 'hoods.RDS'))
 results <- centroid_join(results, hoods)
 
 
 ####### Parks ####### 
-parks <- st_read('../data/Park Lands - Recreation and Parks Department.geojson')
+parks <- st_read(file.path(DATA_DIR, 'Park Lands - Recreation and Parks Department.geojson'))
 parks$acres = as.numeric(parks$acres)
 parks = parks[parks$map_park_n != 'Camp Mather',]
 parks = parks[parks$acres > 1,]
 results['park_dist'] <- parallelize_nearest_dist(results[, 'geometry'], parks)
 
 ###### Colleges ######
-colleges <- st_read('../data/Schools_College_20240215.geojson')
+colleges <- st_read(file.path(DATA_DIR, 'Schools_College_20240215.geojson'))
 colleges = colleges[as.numeric(st_area(colleges)) / 4047 > 1,]
 results['college_dist'] <- parallelize_nearest_dist(results[, 'geometry'], colleges)
 
 
 ###### Save results to disk #####
-saveRDS(results, '../five_rezonings_processed.RDS')
+saveRDS(results, file.path(PROJECT_DIR, 'five_rezonings_processed.RDS'))
 
 print(Sys.time() - start)
+}
+
+
+if (sys.nframe() == 0) {
+  preprocess()
+}
