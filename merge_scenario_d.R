@@ -7,23 +7,22 @@ library(modelr)
 library(caret)
 library(sf)
 library(sfarrow)
+source('./constants.R')
 
-setwd('~/Desktop/rezoner2/rezoner')
+merge_scenario <- function() {
+
 ######### Create a dataset for the Fall 2023 rezoning #############
-map4 <- st_read('../Fall2023Rezoning.json', promote_to_multi=F)
-map5 <- st_read('../rezone_sites_1_2024.geojson', promote_to_multi=F)
+map4 <- st_read(file.path(PROJECT_DIR, 'Fall2023Rezoning.json'), promote_to_multi=F)
+map5 <- st_read(file.path(PROJECT_DIR, 'rezone_sites_1_2024.geojson'), promote_to_multi=F)
 map5 <- st_transform(map5, st_crs(map4))
-
-
 
 # The above dataset lacks info on the fourplex rezoning, so I have to separately
 # load the block-level dataset on where fourplexes are allowed now.
-fourplex <- st_read('../fourplex_areas_12_2023.geojson')
+fourplex <- st_read(file.path(PROJECT_DIR, 'fourplex_areas_12_2023.geojson'))
 fourplex <- st_transform(fourplex, st_crs(map4))
 
-corner <- st_read('../data/Parcels_Corner.geojson')
+corner <- st_read(file.path(PROJECT_DIR, 'data/Parcels_Corner.geojson'))
 corner <- st_transform(corner, st_crs(map4))
-
 
 map4 <- map4 %>%
   mutate(M4_ZONING = ifelse(grepl("Unchanged", HeightText), NA, HeightText)) %>%
@@ -56,16 +55,15 @@ new_map <- new_map %>%
   st_as_sf(crs=st_crs(map4))
 
 
-
 ######### Load and clean sites inventory dataset #############
-sf_sites_inventory <- read_excel("../sf-sites-inventory-form-Dec-2022 - Copy.xlsx", 
+sf_sites_inventory <- read_excel(file.path(PROJECT_DIR, 'sf-sites-inventory-form-Dec-2022 - Copy.xlsx'), 
                                  sheet = "Table B -Submitted-Dec-22", 
                                  skip=1, 
                                  na='n/a')
 # I need a spatial join to merge the Fall 2023 dataset with the sites inventory 
 # dataset. Hence, I'm first joining the sites inventory with a geospatial 
 # bluesky dataset.
-sf_history <- readRDS('../data/geobluesky.RDS')
+sf_history <- readRDS('./data/geobluesky.RDS')
 sf_history <- st_transform(sf_history, crs=st_crs(map4))
 
 # Clean and join
@@ -160,8 +158,13 @@ final[!is.na(final$M3_ZONING) & final$M3_ZONING == fourplex_description & final$
 final[!is.na(final$M4_ZONING) & final$M4_ZONING == fourplex_description & final$is_corner, 'M4_ZONING'] <- sixplex_description
 final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$is_corner, 'M5_ZONING'] <- sixplex_description
 
-
-
 final <- st_sf(final)
 final <- st_transform(final[1:nrow(final),], crs = 4326)
-saveRDS(final, '../five_rezonings.RDS')
+saveRDS(final, file.path(PROJECT_DIR, 'five_rezonings.RDS'))
+
+}
+
+
+if (sys.nframe() == 0) {
+  merge_scenario()
+}

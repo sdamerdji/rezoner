@@ -1,11 +1,13 @@
 library(dplyr)
 library(sf)
-# Run this script from rezoner subdirectory
-setwd('~/Desktop/rezoner2/rezoner')
-df <- readRDS('../five_rezonings_processed_br.RDS')
-tax <- st_read('../Assessor Historical Secured Property Tax Rolls_20240121.geojson')
+source('./constants.R')
 
 parcels_to_exclude <- c('State of California Property', 'Under Water Lot')
+
+filter_extraneous <- function() {
+df <- readRDS(file.path(PROJECT_DIR, 'five_rezonings_processed.RDS'))
+tax <- st_read(file.path(PROJECT_DIR, 'Assessor Historical Secured Property Tax Rolls_20240121.geojson'))
+
 # Get bad parcels
 bad_parcels <- tax %>%
   filter((property_class_code_definition %in% parcels_to_exclude) | 
@@ -30,7 +32,7 @@ filtered <- filtered %>% select(-MapBlkLot_Master, -Developed,
 
 
 # Remove pipeline
-pipeline <- st_read('../data/SF Development Pipeline 2022 Q1 [REVISED]_20240331.geojson')
+pipeline <- st_read(file.path(DATA_DIR, 'SF Development Pipeline 2022 Q1 [REVISED]_20240331.geojson'))
 pipeline <- pipeline[!is.na(pipeline$pipeline_units) 
                       & (as.numeric(pipeline$pipeline_units) > 0)
                       & !(is.na(pipeline$unitsnet)) 
@@ -50,10 +52,17 @@ filtered[!is.na(filtered$M5_ZONING) & (filtered$M5_ZONING %in% c(fourplex, sixpl
 
 
 # Remove lots under highways
-streets <- st_read('../data/Streets   Active and Retired_20240331.geojson')
+streets <- st_read(file.path(DATA_DIR, 'Streets   Active and Retired_20240331.geojson'))
 highways <- streets[streets$layer == 'FREEWAYS' & streets$active == 'true',]
 highway_lines <- st_union(highways)
 filtered <- st_filter(filtered, highway_lines, .predicate=st_disjoint)
 nrow(filtered)
 
-saveRDS(filtered, '../five_rezonings_filtered.RDS')
+saveRDS(filtered, file.path(PROJECT_DIR, 'five_rezonings_filtered.RDS'))
+
+}
+
+
+if (sys.nframe() == 0) {
+  filter_extraneous()
+}
