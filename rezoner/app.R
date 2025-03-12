@@ -12,14 +12,6 @@ source('./ui.R', local=T)
 source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 
-# pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), palette = "viridis", right = FALSE) {
-#  colors <- viridis::viridis(length(bins) - 1, option = palette)
-#  colors <- stringr::str_sub(colors, 1, 7) # remove alpha channel
-#  binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
-#  return(colors[binIndex])
-# }
-
-# pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), colors = c("#D2EBEB", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
 pal <- function(x, bins = c(1, 6, 8, 14, 24, Inf), colors = c("#D2EBEB", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
   binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
   return(colors[binIndex])
