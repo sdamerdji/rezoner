@@ -8,18 +8,30 @@ filter_extraneous <- function() {
 df <- readRDS(file.path(PROJECT_DIR, 'five_rezonings_processed.RDS'))
 tax <- st_read(file.path(PROJECT_DIR, 'Assessor Historical Secured Property Tax Rolls_20240121.geojson'))
 
+# Load custom data to filter, which should have an "APN" column
+csv_file_path <- file.path(PROJECT_DIR, 'mapblocklots_to_exclude.csv')
+if (file.exists(csv_file_path)) {
+  csv_data <- read.csv(csv_file_path)
+  mapblocklots_to_exclude <- csv_data$APN
+} else {
+  mapblocklots_to_exclude <- character(0)  # Empty character vector if file does not exist
+}
+
 # Get bad parcels
 bad_parcels <- tax %>%
   filter((property_class_code_definition %in% parcels_to_exclude) | 
            (exemption_code_definition == 'Cemetary') | (block == '9900') |
            (block == '0006' & lot == '001') | (block == '1300' & lot == '001') |
-           (block == '0409' & lot == '002') | (block == '7501'))
-           
-           #(block == '1313' & lot == '016') | (block == '1461' & lot == '001') |
-           #(block == '1849' & lot == '054') | (block == '1481') |
-           #(block == '1756' & lot == '001') | (block == '7501'))
+           (block == '0409' & lot == '002') | (block == '7501') |
+           (parcel_number %in% mapblocklots_to_exclude)
+         #(block == '1313' & lot == '016') | (block == '1461' & lot == '001') |
+         #(block == '1849' & lot == '054') | (block == '1481') |
+         #(block == '1756' & lot == '001') | (block == '7501')
+          )
+
 to_exclude <- st_union(bad_parcels)
 filtered <- st_filter(df, to_exclude, .predicate=st_disjoint)
+
 nrow(filtered)
 
 filtered <- filtered[filtered$ex_height2024 < 1111,]
@@ -61,7 +73,6 @@ nrow(filtered)
 saveRDS(filtered, file.path(PROJECT_DIR, 'five_rezonings_filtered.RDS'))
 
 }
-
 
 if (sys.nframe() == 0) {
   filter_extraneous()
