@@ -12,9 +12,15 @@ source('./ui.R', local=T)
 source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 
-pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), palette = "viridis", right = FALSE) {
-  colors <- viridis::viridis(length(bins) - 1, option = palette)
-  colors <- stringr::str_sub(colors, 1, 7) # remove alpha channel
+# pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), palette = "viridis", right = FALSE) {
+#  colors <- viridis::viridis(length(bins) - 1, option = palette)
+#  colors <- stringr::str_sub(colors, 1, 7) # remove alpha channel
+#  binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
+#  return(colors[binIndex])
+# }
+
+# pal <- function(x, bins = c(1, 5, 8, 10, 20, Inf), colors = c("#D2EBEB", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
+pal <- function(x, bins = c(1, 6, 8, 14, 24, Inf), colors = c("#D2EBEB", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
   binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
   return(colors[binIndex])
 }
@@ -963,16 +969,20 @@ server <- function(input, output, session) {
   
   output$dynamicLegend <- renderUI({
     if (input$map == "heights") {
-      layers <- c('0-4 stories',
-                  '5-7 stories',
-                  '8-9 stories',
-                  '10-19 stories',
-                  '20+ stories')
-      colors <- c('#440154',
-                  '#3B528B',
-                  '#21908C',
-                  '#5DC863',
-                  '#FDE725')
+      layers <- c(#'unchanged',
+                  '65 feet (6 stories)',
+                  '85 feet(8 stories)',
+                  '140 feet (14 stories)',
+                  '240 feet (24 stories)',
+                  '300 feet (30 stories)'
+      )
+      colors <- c(#"#D2EBEB", 
+                  "#F4AD3E", 
+                  "#EC7520", 
+                  "#E44520", 
+                  "#AE2922", 
+                  "#6C2F18"
+                  )
       if (input$scenario %in% c('A', 'B', 'C', 'D', 'E')) {
         legend_name <- 'Zoning + Bonus'
       } else {
