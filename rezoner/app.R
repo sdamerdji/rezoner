@@ -326,14 +326,14 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     df['M6_ZONING'] <- df$M5_ZONING
     # density decontrol in HRN
     df[
-      (!df$peg) & 
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
       !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
     df[
-      (!df$peg) & 
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
         is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
     
     df[
-      (!df$peg) & 
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
         !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
       & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
     df['ZONING'] <- df$M6_ZONING
@@ -435,6 +435,10 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
       expected_units_if_dev = if_else(!is.na(ZONING) & ZONING == sixplex, pmin(expected_units_if_dev, 6), expected_units_if_dev)
 
     )
+  # BR density restrictions
+  if (scenario == 'BR') {
+    df$expected_units_if_dev <- pmin(df$expected_units_if_dev, df$builders_remedy_du_acre * df$ACRES, na.rm=T)
+  }
   sdbl <- 1 + .4 * .6
   if (stack_sdbl) {
       # Add density bonus
@@ -510,10 +514,22 @@ server <- function(input, output, session) {
   # Update the reactive value whenever input features change
   observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl), {
     if (input$years_slider <= 10 & input$years_slider >= 5){
-      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl))
+      if (input$scenario == "BR") {
+        
+      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, T))
+      } else{
+        updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, F))
+        
+      }
     }
   })
-  
+  observeEvent(input$scenario, {
+    if (input$scenario == "BR") {
+      updateSwitchInput(session, "stack_sdbl", value = TRUE)
+    } else {
+      updateSwitchInput(session, "stack_sdbl", value = FALSE)
+    }
+  })
   output$dynamicRezoneHeader <- renderUI({
     # Check if the list is empty
     if(length(user_rezoning$lists) == 0) {

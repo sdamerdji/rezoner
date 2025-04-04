@@ -35,10 +35,18 @@ df$sb9[
 df$sb9 <- df$sb9 / df$ACRES # to get du / acre
 sf_use_s2(TRUE)
 
+df['ab2011'] <- 0.0
+sf_use_s2(FALSE)
 
-# TODO: high priority - fix sb 2011
-df['sb2011'] <- 0.0
-df['state_law'] = 3 * pmax(df$sb9, df$sb2011, na.rm=T)
+ab2011 <- read_sf('../data/ab2011.geojson')
+ab2011 <- ab2011[ab2011$color %in% c('blue', 'grey'),] # eligible for height benefits https://sfplanning.org/sites/default/files/documents/director/AB2011PackageFAQ.pdf
+ab2011 <- st_transform(ab2011, st_crs(df))
+intersections <- st_join(df, ab2011, left=F)
+df$ab2011[
+  (df$mapblklot %in% intersections$mapblklot)
+] <- 80
+df['state_law'] = 3 * pmax(df$sb9, df$ab2011, na.rm=T)
+sf_use_s2(TRUE)
 
 # TODO: 2x check there's no public, geospatial dataset of du/acre for density-restricted zoning designations
 df['local_zoning'] <- 0
@@ -50,14 +58,25 @@ df['local_zoning'] <- df$local_zoning * 3
 df['builders_remedy_du_acre'] <- pmax(df$local_zoning, df$state_law, df$mullin, df$housing_element, na.rm=T)
 
 
-# TODO: Only add increment where tcac = 'high' or 'highest' OR one-half mile of a major transit stop OR 
-# "A very low vehicle travel area
-# Blocker for this is getting a geojson defining one half mile of a major transit stop and low vehicle travel area
-# from this website: https://sitecheck.opr.ca.gov/
-# which only has arcgis format (which is lame)
-increment <- 35
-df['builders_remedy_du_acre'] <- df$builders_remedy_du_acre + increment
+# Adding 35 du/acre increment df
+sf_use_s2(FALSE)
 
+half_mile_transit <- read_sf('../data/transitstops-half-mile-radius.geojson')
+half_mile_transit <- half_mile_transit[half_mile_transit$agency_primary == 'City and County of San Francisco',]
+
+low_vmt <- read_sf('../data/below15vmt.geojson')
+low_vmt_intersections <- st_join(df, low_vmt, left=F)
+half_mile_transit_intersections <- st_join(df, half_mile_transit, left=F)
+df['low_vmt'] <-  F
+df['half_mile_transit'] <- F
+df[(df$mapblklot %in% low_vmt_intersections$mapblklot), 'low_vmt'] <- T
+df[(df$mapblklot %in% half_mile_transit_intersections$mapblklot), 'half_mile_transit'] <- T
+  
+increment <- 35
+mask <- df$half_mile_transit | df$low_vmt | df$affh2023 %in% c('High Resource', 'Highest Resource')
+df[mask, 'builders_remedy_du_acre'] <- df$builders_remedy_du_acre[mask] + increment
+
+sf_use_s2(TRUE)
 
 max_envelope <- max(df$Envelope_1000)
 
@@ -71,8 +90,6 @@ calculate_du_count <- function(height, ACRES, building_efficiency_discount) {
     n_floors_residential <- pmin(n_floors_residential, 12)
   }
   lot_sqft <- ACRES * 43560
-  print(ground_floor)
-  print(n_floors_residential)
   if (height <= 85) {
     expected_built_envelope <- ground_floor * n_floors_residential
   } else if (height > 85 && lot_sqft < 12000) {
@@ -121,5 +138,7 @@ find_required_height <- function(ACRES, dwellings_per_acre, building_efficiency_
 df <- df %>%
   mutate(BR_ZONING = mapply(find_required_height, ACRES, builders_remedy_du_acre))
 
+# dont mark builders remedy as upzoning a parcel if its already residential and has the same height allowance under existing zoning
+df$BR_ZONING[df$sb330_applies & !is.na(df$ex_height2024) & (df$BR_ZONING <= df$ex_height2024)] <- NA
 
 saveRDS(df, '../five_rezonings_processed_br.RDS')
