@@ -12,7 +12,8 @@ source('./ui.R', local=T)
 source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 
-pal <- function(x, bins = c(1, 6, 8, 14, 24, Inf), colors = c("#D2EBEB", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
+pal <- function(x, bins = c(1, 4, 6, 8, 13, 24, Inf),
+                colors = c("#D2EBEB", "#FDEBC9", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
   binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
   return(colors[binIndex])
 }
@@ -321,19 +322,24 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     df['ZONING'] <- df$BR_ZONING
   }
   if (scenario == 'F') {
-    df['M6_ZONING'] <- df$M5_ZONING
+    df['ZONING'] <- df$M6_ZONING
+    large_lot <- 8000
+    large_lot_acres <- large_lot / 43560
+    # df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > 0.1836547), 'M6_height'] <- 65
+    df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > large_lot_acres), 'M6_ZONING'] <- "65' Height Allowed"
+
     # density decontrol in HRN
-    df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
-      !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
-    df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
-        is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
-    
-    df[
-      (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
-        !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
-      & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #   !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #     is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
+    # 
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #     !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
+    #   & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
     df['ZONING'] <- df$M6_ZONING
   }
   if (scenario == 'Union') {
@@ -977,24 +983,24 @@ server <- function(input, output, session) {
   
   output$dynamicLegend <- renderUI({
     if (input$map == "heights") {
-      layers <- c(#'unchanged',
+      layers <- c('55 feet (5 stories)',
                   '65 feet (6 stories)',
-                  '85 feet(8 stories)',
+                  '85 feet (8 stories)',
                   '140 feet (14 stories)',
                   '240 feet (24 stories)',
                   '300 feet (30 stories)'
       )
-      colors <- c(#"#D2EBEB", 
+      colors <- c("#FDEBC9",
                   "#F4AD3E", 
                   "#EC7520", 
                   "#E44520", 
                   "#AE2922", 
                   "#6C2F18"
                   )
-      if (input$scenario %in% c('A', 'B', 'C', 'D', 'E')) {
+      if (input$scenario %in% c('A', 'B', 'C', 'D', 'E', 'F')) {
         legend_name <- 'Zoning + Bonus'
       } else {
-        legend_name <- 'Base Zoning'
+        legend_name <- 'Zoning'
       }
     } else if (input$map == "potential") { # Potential
       # Default or other conditions

@@ -44,7 +44,11 @@ ui <- fluidPage(
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
                                 "Builder's Remedy (WIP)" = "BR",
+                                "April 2025 Family Rezoning (WIP)" = "F",
+                                
                                 "Feb 2024 SF Planning Proposal" = "E",
+                                "Feb 2024 SF Planning Proposal + decontrol 4 stories in WRN" = "G",
+                                
                                # "Current SF Planning Proposal + decontrol 4 stories in WRN" = "F",
                                 "Fall 2023 SF Planning Proposal" = "D",
                                 
