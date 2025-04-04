@@ -139,7 +139,4 @@ as_n_stories <- function(zoning_name) {
    # "TRUE & !((ex_height2024 >= 105) & sb330_applies) & (econ_affh >= 0.88)",
    "TRUE & !((ex_height2024 >= 85) & sb330_applies) & (commercial_dist <= 0.05)",
    "TRUE & !((ex_height2024 >= 85) & sb330_applies) & ((transit_dist_bart <= 0.1))"
-
  )
-
-

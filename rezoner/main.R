@@ -1,14 +1,22 @@
-setwd('~/Desktop/rezoner')
-rm(list = ls())
+setwd(dirname(this.path::here()))  # Set wd to project root
+source('./constants.R')
+source(file.path(PROJECT_DIR, 'merge_scenario_d.R'))
+source(file.path(PROJECT_DIR, 'preprocessing.R'))
+source(file.path(PROJECT_DIR, 'filter_out_extraneous.R'))
+source(file.path(PROJECT_DIR, 'to_mapbox.R'))
+
+merge_scenario()
 gc()
-source('~/Desktop/rezoner/merge_scenario_d.R', local=F)
-rm(list = ls())
+print("Done merging scenario")
+
+preprocess()
 gc()
-source('~/Desktop/rezoner/preprocessing.R', local=F)
-rm(list = ls())
+print("Done preprocessing")
+
+filter_extraneous()
 gc()
-source('~/Desktop/rezoner/filter_out_extraneous.R', local=F)
-rm(list = ls())
+print("Done filtering extraneous")
+
+to_mapbox()
 gc()
-source('~/Desktop/rezoner/to_mapbox.R', local=F)
-rm(list = ls())
+print("Done converting to mapbox")

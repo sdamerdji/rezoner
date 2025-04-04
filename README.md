@@ -35,7 +35,7 @@ git lfs pull
 Then, on top of the packages installed to run app.R (see the above section), install these additional R packages:
 
 ```
-required_packages <- c("readr", "tidyr", "modelr", "caret", "sfarrow", "tidytransit", "doParallel", "lwgeom")
+required_packages <- c("readr", "readxl", "tidyr", "modelr", "caret", "sfarrow", "rmapshaper", "tidytransit", "doParallel", "lwgeom")
 missing_packages <- setdiff(required_packages, installed.packages()[, "Package"])
 
 if (length(missing_packages) > 0) {
