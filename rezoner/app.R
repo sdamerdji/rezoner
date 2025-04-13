@@ -410,13 +410,7 @@ server <- function(input, output, session) {
   # Update the reactive value whenever input features change
   observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl), {
     if (input$years_slider <= 10 & input$years_slider >= 5){
-      if (input$scenario == "BR") {
-        
-      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, T))
-      } else{
-        updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, F))
-        
-      }
+      updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl))
     }
   })
   observeEvent(input$scenario, {
