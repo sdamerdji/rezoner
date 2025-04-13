@@ -12,7 +12,7 @@ source('./ui.R', local=T)
 source('./utils.R', local=T)
 model <- readRDS(file='./light_model.rds') 
 
-pal <- function(x, bins = c(1, 4, 6, 8, 13, 24, Inf),
+pal <- function(x, bins = c(1, 5, 6, 8, 13, 24, 30, Inf),
                 colors = c("#D2EBEB", "#FDEBC9", "#F4AD3E", "#EC7520", "#E44520", "#AE2922", "#6C2F18"), right = FALSE) {
   binIndex <- findInterval(x, vec = bins, rightmost.closed = right, all.inside = TRUE)
   return(colors[binIndex])
@@ -24,7 +24,6 @@ LAYER_ID = 'parcels_id'
 df <- readRDS('./five_rezonings_nongeo.RDS')
 df_mapbox <- readRDS('./sf_map.RDS')
 
-
 # Years after rezoning
 max_envelope <- max(df$Envelope_1000)
 fourplex <- 'Increased density up to four units'
@@ -32,28 +31,13 @@ sixplex <- 'Increased density up to six units'
 density_restricted <- c(fourplex, sixplex)
 decontrol <- "No height change, density decontrol"
 skyscrapers <-  "300' Height Allowed"
-parisian_height <- 75
-parisian <- paste0(parisian_height, "' Height Allowed")
 fill_style =
   list(id = "parcels_id", type = "fill", source = "parcels_source",
        fill_antialias = F,
        filter = list("in", "mapblklot",  "fake"),
        paint = list("fill-color" = "blue"))
 
-paris <- function(df) {
-  # Find all M3_ZONING with fourplex or decontrol and set to 55'
-  df[(!is.na(df$ZONING)) 
-     & ((df$ZONING %in% density_restricted) | 
-          (df$ZONING == decontrol) | 
-          (as.numeric(str_extract(df$ZONING, "\\d+")) < parisian_height)), 'ZONING'] <- parisian
-  
-  df[is.na(df$ZONING) & (!is.na(df$M1_ZONING) | 
-                           !is.na(df$M2_ZONING) |
-                           !is.na(df$M3_ZONING) |
-                           !is.na(df$M4_ZONING) |
-                           !is.na(df$M5_ZONING)), 'ZONING'] <- parisian
-  df
-}
+
 
 legalize_it <- function(df) {
   df[, 'ZONING'] <- skyscrapers
@@ -96,83 +80,6 @@ height_setter <- function(ZONING, new_height, old_height) {
 
 upzone <- function(df) {
   sum(pmax(df$expected_units - df$expected_units_baseline, 0))
-}
-
-yimbytown <- function(df) {
-  df %>%
-    union_of_maxdens() %>%
-    # General transit upzoning in high opp areas with step down
-    mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg & !((ex_height2024 > 85) & sb330_applies) &
-                             (affh2023 %in% c('High Resource', 'Highest Resource')),
-                           get_denser_zone("85' Height Allowed", ZONING),
-                           ZONING)) %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg & !((ex_height2024 > 55) & sb330_applies) &
-                             (affh2023 %in% c('High Resource', 'Highest Resource')),
-                           get_denser_zone("55' Height Allowed", ZONING),
-                           ZONING)) %>%
-    # Transit-oriented uzponing with step down for southern part of the city
-    mutate(ZONING = ifelse((transit_dist_bart < .1) &
-                             !peg & !((ex_height2024 > 120) & sb330_applies) &
-                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
-                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
-                           get_denser_zone("120' Height Allowed", ZONING),
-                           ZONING))  %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg & !((ex_height2024 > 85) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior',
-                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside'),
-                           get_denser_zone("85' Height Allowed", ZONING),
-                           ZONING)) %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg & !((ex_height2024 > 55) & sb330_applies) &
-                             nhood %in% c('Outer Mission', 'Glen Park', 'Excelsior', 
-                                          'Bernal Heights', 'Noe Valley', 'Oceanview/Merced/Ingleside') &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')),
-                           get_denser_zone("55' Height Allowed", ZONING),
-                           ZONING)) %>%
-    # Transit-oriented upzoning with step down for northern part of the city
-    mutate(ZONING = ifelse((transit_dist_bart < .115 | transit_dist_caltrain < .115 | transit_dist_rapid < .115) &
-                             !peg & !((ex_height2024 > 120) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
-                           get_denser_zone("120' Height Allowed", ZONING),
-                           ZONING)) %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg & !((ex_height2024 > 85) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             nhood %in% c('Presidio Heights', 'Pacific Heights', 'Nob Hill', 'Japantown', 'Lone Mountain/USF'),
-                           get_denser_zone("85' Height Allowed", ZONING),
-                           ZONING)) %>%
-    # Set a higher zoning floor for Marina, Russian Hill, Pac Heights, Nob Hill, North Beach 
-    mutate(ZONING = ifelse(!peg & !((ex_height2024 > 55) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             (nhood %in% c('Marina', 'Russian Hill', 'Pacific Heights', 'Nob Hill', 'North Beach')),
-                           get_denser_zone("55' Height Allowed", ZONING),
-                           ZONING)) %>%
-    # Transit-oriented upzoning for Portrero and Mission Bay
-    mutate(ZONING = ifelse((transit_dist_bart < .25 | transit_dist_caltrain < .25 | transit_dist_rapid < .25) &
-                             !peg & !((ex_height2024 > 85) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             is.na(ZONING) &
-                             nhood %in% c('Potrero Hill', 'Mission Bay'),
-                           get_denser_zone("85' Height Allowed", ZONING),
-                           ZONING)) %>%
-    mutate(ZONING = ifelse((transit_dist_bart < .5 | transit_dist_caltrain < .5 | transit_dist_rapid < .5) &
-                             !peg & !((ex_height2024 > 65) & sb330_applies) &
-                             (affh2023 %in% c('Moderate Resource', 'High Resource', 'Highest Resource')) & 
-                             is.na(ZONING) &
-                             nhood %in% c('Potrero Hill', 'Mission Bay'),
-                           get_denser_zone("65' Height Allowed", ZONING),
-                           ZONING)) %>%
-    # Geary and Masonic intersection
-    mutate(ZONING = ifelse((stringr::str_sub(df$mapblklot, 1, 3) %in% c('107', '108', '109')) &
-                             !((ex_height2024 > 240) & sb330_applies),
-                           get_denser_zone("240' Height Allowed", ZONING),
-                           ZONING))     
 }
 
 yimbycity <- function(df) {
@@ -327,7 +234,7 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     large_lot_acres <- large_lot / 43560
     # df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > 0.1836547), 'M6_height'] <- 65
     df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > large_lot_acres), 'M6_ZONING'] <- "65' Height Allowed"
-
+    
     # density decontrol in HRN
     # df[
     #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
@@ -342,25 +249,21 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     #   & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
     df['ZONING'] <- df$M6_ZONING
   }
-  if (scenario == 'Union') {
-    df <- union_of_maxdens(df)
-    
-  }
-  if (scenario == 'Parisian') {
+  if (scenario == 'G') {
     df['ZONING'] <- df$M5_ZONING
-    df <- paris(df)
-  }
-  if (scenario == 'yimby1') {
-    df <- yimbytown(df)
     
-    # .1 miles from rapid transit, bart, caltrain, 
-    # Upzone 
-  }
-  if (scenario == 'yimby2') {
-    df <- yimbytown(df)
-    df[!is.na(df$ZONING) & (df$ZONING %in% density_restricted), 'ZONING'] <- decontrol
-    # .1 miles from rapid transit, bart, caltrain, 
-    # Upzone 
+    #density decontrol in HRN
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) &
+      !is.na(df$M5_ZONING) & (df$M5_ZONING %in% density_restricted), 'ZONING'] <-  "40' Height Allowed"
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) &
+        is.na(df$M5_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'ZONING'] <-  "40' Height Allowed"
+
+    df[
+      (df$affh2023 %in% c('High Resource', 'Highest Resource')) &
+        !is.na(df$M5_ZONING) & (df$M5_ZONING == 'No height change, density decontrol')
+      & !((df$ex_height2024 >= 45) & df$sb330_applies), 'ZONING'] <- "40' Height Allowed"
   }
   if (scenario == 'yimby3') {
     df <- yimbycity(df)
@@ -473,6 +376,8 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     ) %>%
     select(-Envelope_1000_new, -existing_sqft)
   print(df %>% group_by(ZONING) %>% summarize(round(sum(net_units)), n()))
+  print(df %>% filter(!is.na(ZONING)) %>% group_by(height) %>% summarize(round(sum(net_units)), n()))
+  
   print(df %>% arrange(desc(net_units)) %>% select(mapblklot, net_units, expected_built_envelope) %>% head(10))
   print(paste0('Dataframe update took: ', round(Sys.time() - start, 1)))
   return(df)
@@ -495,19 +400,6 @@ generate_plot <- function() {
 
 calculate_shortfall <- function(df) {
   return(upzone(df))
-}
-
-simulate_buildout <- function(to_plot) {
-  sf_use_s2(T)
-  to_plot <- to_plot[runif(nrow(to_plot)) < to_plot$pdev, ]
-  to_plot[,'expected_units_if_dev'] <- to_plot$expected_units_if_dev / max(to_plot$expected_units_if_dev) * 1000
-  # leafletProxy("mainPlot", data = to_plot) %>%
-  #   clearGroup('parcels') %>%
-  #   clearGroup('dynamicMarkers') %>%
-  #   addCircles(lng = to_plot$lng,
-  #              lat = to_plot$lat,
-  #              radius = ~expected_units_if_dev,
-  #              group = 'dynamicMarkers')
 }
 
 # Server logic
@@ -539,14 +431,6 @@ server <- function(input, output, session) {
     if(length(user_rezoning$lists) == 0) {
       h4('Or add your own!')
     } else {
-      # If not empty, select a random message
-      # messages <- c('Why not add another?\nThis city surely has got room for more', 
-      #               'Why not add another?\nThis city surely has got room for more', 
-      #               'You can rezone again\n', 
-      #               
-      #               'Now that\'s starting to look like a city.\n Why not upzone even more?')
-
-
       if ((length(user_rezoning$lists) == 1) && ('list0' %in% names(user_rezoning$lists)) && nchar(user_rezoning$lists$list0$new_expr[1]) == 47) {
       chosen_message <- "Or add your own!\nWhy not click 'specify where' to rezone with precision."
       }
@@ -583,39 +467,6 @@ server <- function(input, output, session) {
     generate_plot()
   })
   
-  # observe({
-  #   overlay <- input$peg
-  #   multipolygon <- readRDS('./peg.RDS')
-  #   if (overlay) {
-  #     # Add the multipolygon layer when overlay is TRUE
-  #     # leafletProxy("mainPlot") %>%
-  #     #   addPolygons(data = multipolygon, fill = .1, group="peg", c='red', weight=.5)
-  #     print('FIX')
-  #   } 
-  # })
-  # 
-  # observe({
-  #   overlay <- input$affh
-  #   multipolygon <- readRDS('./high_opp.RDS')
-  #   if (overlay) {
-  #     # Add the multipolygon layer when overlay is TRUE
-  #     # leafletProxy("mainPlot") %>%
-  #     #   addPolygons(data = multipolygon, fill = NA, group="affh", color='black', weight=1)
-  #     # 
-  #     print("FIX")
-  #   } 
-  # })
-  # observeEvent(c(input$resimulateBtn, input$map, input$scenario), {
-  #   if (input$map == 'sim') {
-  #     df <- updatedData()
-  #     df['block'] <- str_sub(df$mapblklot, 1, 4)
-  #     df$n_stories <- (df$height - 5) %/% 10
-  #     df[!is.na(df$ZONING) & df$ZONING == fourplex & is.na(df$n_stories), 'n_stories'] <- 4
-  #     df[!is.na(df$ZONING) & df$ZONING == decontrol & is.na(df$n_stories), 'n_stories'] <- 4
-  #     to_plot <- filter(df, !is.na(df$ZONING) & !is.na(expected_units) & expected_units > 0)
-  #     simulate_buildout(to_plot)
-  #   }
-  # })
   
   observeEvent({
     list(updatedData(), input$map)
@@ -627,8 +478,7 @@ server <- function(input, output, session) {
     
     # Group by
     df['block'] <- str_sub(df$mapblklot, 1, 4)
-    df$n_stories <- (as.numeric(str_extract(df$ZONING, "\\d+")) - 5) %/% 10
-    df$n_stories <- (df$height - 5) %/% 10
+    df$n_stories <- ifelse(df$height > 50, (df$height - 5) %/% 10, df$height %/% 10)
     df[!is.na(df$ZONING) & df$ZONING %in% c(fourplex, sixplex) & is.na(df$n_stories), 'n_stories'] <- 4
     df[!is.na(df$ZONING) & df$ZONING == decontrol & is.na(df$n_stories), 'n_stories'] <- 4
     
@@ -727,9 +577,9 @@ server <- function(input, output, session) {
     else if (input$map == 'E[u]') {
       to_plot <- filter(df, !is.na(ZONING) & !is.na(net_units) & net_units > 0)
       sf_use_s2(T)
-      to_plot$net_units <- log10(1 + (to_plot$net_units/to_plot$ACRES))
+      to_plot$net_units <- log2(1 + (to_plot$net_units/to_plot$ACRES))
       pal_eu <- customColorNumeric(
-        domain = c(0, 4), n=3
+        domain = c(0, 4), n=5
       )
       apns <- unique(to_plot$mapblklot)
       new_map <- do.call(set_filter,
@@ -753,29 +603,9 @@ server <- function(input, output, session) {
       do.call(set_paint_property, arg_list) %>%
         update_mapboxer()
       
-    } else if (input$map == 'sim') {
-      to_plot <- filter(df, !is.na(expected_units) & expected_units > 0)
-      simulate_buildout(to_plot)
-    }
+    } 
   })
   
-  
-  # output$pieChart <- renderPlotly({
-  #   added_capacity <- round(calculate_shortfall(df = updatedData()))
-  #   print(added_capacity)
-  #   
-  #   pie_data <- data.frame(
-  #     category = c("Added Capacity", "Remaining Shortfall"),
-  #     value = c(added_capacity, 36282 - added_capacity)
-  #   )
-  # 
-  #   plot_ly(pie_data, labels = ~category, values = ~value, type = 'pie',
-  #           marker = list(colors = c('green', 'grey')),
-  #           textinfo = 'hilvalue',
-  #           insidetextorientation = 'radial') %>%
-  #     layout(showlegend = F)
-  # })
-  # 
   output$dynamic_delete_button <- renderUI({
     if(requirements$count > 0) {
       actionButton("delete_requirement", "Remove last")
@@ -1009,8 +839,8 @@ server <- function(input, output, session) {
       colors <- c("#EFF3FF", "#BDD7E7", "#6BAED6", "#3182BD", "#08519C") # Replace with appropriate color codes
     } else if (input$map == "E[u]") { # Expect units added per acre
       legend_name <- 'Expected du/ac added'
-      layers <- c("<10 du/ac", "10-100 du/ac", "100+ du/ac")
-      colors <- c("#EFF3FF", "#6BAED6", "#08519C") # Replace with appropriate color codes      
+      layers <- c("<2 du/ac",'2-4 du/ac', '4-8 du/ac', "8-16 du/ac", "16+ du/ac")
+      colors <- c("#EFF3FF", "#BDD7E7", "#6BAED6", "#3182BD", "#08519C")  # Replace with appropriate color codes      
     } else if (input$map == 'sim') {
       assertthisshouldfail
     }
@@ -1279,19 +1109,6 @@ server <- function(input, output, session) {
     requirements$ids <- list()
   })
 }
-
-
-# observe({
-#   if(input$customize_map == "yes") {
-#     # Change cursor to paint roller
-#     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "url(/paint-brush/brownpntbrush.cur), auto";')
-#   } else {
-#     # Revert cursor to default
-#     shinyjs::runjs('document.getElementById("mainPlot").style.cursor = "default";')
-#   }
-# })
-
-
 
 
 shinyApp(ui = ui, server = server)
