@@ -27,15 +27,20 @@ centroid_join <- function(parcels_df, auxiliary_df) {
 }
 
 parallelize_nearest_dist <- function(parcels_df, auxiliary_df) {
-  n_cores = detectCores() - 1
+  n_cores <- detectCores() - 2
+  cl <- makeCluster(n_cores)          # Create a cluster object
+  registerDoParallel(cl)               # Register the cluster for foreach
+  
+  # Create chunks outside if necessary
   chunks <- split(parcels_df, cut(seq_len(nrow(parcels_df)), n_cores, labels = FALSE))
   
-  registerDoParallel(cores = n_cores)
-  
   nearest_parallel <- function(df_chunk) {
+    library(sf)
     dists <- sapply(1:nrow(df_chunk), function(i) {
-      nearest = st_nearest_feature(df_chunk[i, ], auxiliary_df)
-      dist = st_distance(df_chunk[i, ], auxiliary_df[nearest, ], by_element = TRUE, tolerance=0.01 * 1609)
+      nearest <- st_nearest_feature(df_chunk[i, ], auxiliary_df)
+      dist <- st_distance(df_chunk[i, ], auxiliary_df[nearest, ], 
+                          by_element = TRUE, 
+                          tolerance=0.01 * 1609)
       as.numeric(dist / 1609) # Convert meters to miles
     })
     return(dists)
@@ -44,6 +49,8 @@ parallelize_nearest_dist <- function(parcels_df, auxiliary_df) {
   result <- foreach(chunk = chunks, .combine = 'c') %dopar% {
     nearest_parallel(chunk)
   }
+  
+  stopCluster(cl)    # Explicitly shut down the cluster
   return(result)
 }
 
@@ -180,10 +187,13 @@ results[, 'lat'] <- points[,2]
 gtfs_obj <- read_gtfs(file.path(DATA_DIR, 'google_transit.zip'))
 muni_geo <- gtfs_as_sf(gtfs_obj, crs=st_crs(results))
 
-# All Muni lines with <15 min frequency
+# All Muni lines with <10 min frequency
 uq_trips <- muni_geo$trips[!duplicated(muni_geo$trips[,c('route_id', 'shape_id')]),]
 muni <- inner_join(uq_trips, muni_geo$shapes)
-high_frequency_routes <- get_route_frequency(gtfs_obj) %>% arrange(median_headways) %>% filter(median_headways < 60 * 15) %>% select(route_id)
+high_frequency_routes <- get_route_frequency(gtfs_obj) %>% 
+  arrange(median_headways) %>% 
+  filter((median_headways < 60 * 8) | str_detect(route_id, 'R$') | route_id %in% c('J', 'L', 'K', 'M', 'N', 'T')) %>% 
+  select(route_id)
 muni <- muni[muni$route_id %in% high_frequency_routes$route_id, ]
 muni <- st_as_sf(muni, crs=st_crs(results))
 results['transit_dist'] <- parallelize_nearest_dist(results[, 'geometry'], muni)
@@ -215,6 +225,7 @@ results['transit_dist_caltrain'] <- parallelize_nearest_dist(results[, 'geometry
 ###### Commercial Corridors ###### 
 zoning <- st_read(file.path(DATA_DIR, 'Zoning Map - Zoning Districts.geojson'))
 commercial_corridors <- zoning[str_detect(zoning$zoning, '^(NCT)|(RCD)|(NC)|(MU)'),]
+commercial_corridors <- st_make_valid(commercial_corridors)
 results['commercial_dist'] <- parallelize_nearest_dist(results[, 'geometry'], commercial_corridors)
 rm('commercial_corridors', 'zoning', 'rapid_stops', 'rapid_stop_sf', 'rapid_lines', 'bart', 'gtfs_obj')
 gc()
@@ -230,11 +241,13 @@ parks <- st_read(file.path(DATA_DIR, 'Park Lands - Recreation and Parks Departme
 parks$acres = as.numeric(parks$acres)
 parks = parks[parks$map_park_n != 'Camp Mather',]
 parks = parks[parks$acres > 1,]
+parks <- st_make_valid(parks)
 results['park_dist'] <- parallelize_nearest_dist(results[, 'geometry'], parks)
 
 ###### Colleges ######
 colleges <- st_read(file.path(DATA_DIR, 'Schools_College_20240215.geojson'))
 colleges = colleges[as.numeric(st_area(colleges)) / 4047 > 1,]
+colleges <- st_make_valid(colleges)
 results['college_dist'] <- parallelize_nearest_dist(results[, 'geometry'], colleges)
 
 
@@ -248,3 +261,4 @@ print(Sys.time() - start)
 if (sys.nframe() == 0) {
   preprocess()
 }
+
