@@ -14,7 +14,8 @@ library(dplyr)
 # It's also not the end of the world if the height saved for BR_ZONING is less
 # the existing height already allowed on the parcel; these parcels don't factor
 # into the added_capacity estimated in app.R
-
+# This file has the side-effect of removing 22 lots that are TINY (Examples: 0436D035, 1212011F)
+# and rounding errors away from zero.
 df <- readRDS('../five_rezonings_processed.RDS')
 mullin_density <- 30
 df['mullin'] <- 1.5 * mullin_density
@@ -136,6 +137,7 @@ find_required_height <- function(ACRES, dwellings_per_acre, building_efficiency_
 }
 
 df <- df %>%
+  filter(ACRES > 0) %>%
   mutate(BR_ZONING = mapply(find_required_height, ACRES, builders_remedy_du_acre))
 
 # dont mark builders remedy as upzoning a parcel if its already residential and has the same height allowance under existing zoning

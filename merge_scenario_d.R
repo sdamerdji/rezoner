@@ -27,28 +27,31 @@ fourplex <- st_transform(fourplex, st_crs(map4))
 corner <- st_read(file.path(PROJECT_DIR, 'data/Parcels_Corner.geojson'))
 corner <- st_transform(corner, st_crs(map4))
 
+map4 <- map4 %>% mutate(ACRES = round(Shape__Area / 43560, 3))
+map5 <- map5 %>% mutate(ACRES = round(Shape__Area / 43560, 3))
+map6 <- map6 %>% mutate(ACRES = round(Shape__Area / 43560, 3))
+
 map4 <- map4 %>%
   mutate(M4_ZONING = ifelse(grepl("Unchanged", HeightText), NA, HeightText)) %>%
   rename(M4_height = HeightInteger) %>%
-  mutate(ACRES = Shape__Area / 43560) %>%
   select(-HeightText, -OBJECTID, -Shape__Area, -Shape__Length)
+
 
 map5 <- map5 %>%
   mutate(M5_ZONING = ifelse(grepl("Unchanged", NEW_HEIGHT), NA, NEW_HEIGHT)) %>%
   rename(M5_height = NEW_HEIGHT_NUM) %>%
-  mutate(ACRES = Shape__Area / 43560) %>%
   select(-NEW_HEIGHT, -OBJECTID, -Shape__Area, -Shape__Length)
 
 map6 <- map6 %>%
   mutate(M6_ZONING = NEW_HEIGHT) %>%
   mutate(M6_height = as.numeric(str_extract(map6$NEW_HEIGHT, "\\d+"))) %>%
-  mutate(ACRES = Shape__Area / 43560) %>%
   select(-NEW_HEIGHT, -OBJECTID, -height, -gen_hght, -Shape__Area, -Shape__Length)
-map6$M6_ZONING[map6$M6_ZONING == "Density decontrol, unchanged height"] <- "No height change, density decontrol"
+map6$M6_ZONING[map6$M6_ZONING == "Density decontrol, unchanged height"] <- "40' Height Allowed"
+
 
 map4 <- map4[!duplicated(map4), ]
 map5 <- map5[!duplicated(map5), ]
-map6 <- map6[!duplicated(map5), ]
+map6 <- map6[!duplicated(map6), ]
 
 # map4 %>%
 #   group_by(mapblklot, ACRES) %>%
@@ -89,7 +92,7 @@ sf_sites_inventory <- read_excel(file.path(PROJECT_DIR, 'sf-sites-inventory-form
 # I need a spatial join to merge the Fall 2023 dataset with the sites inventory 
 # dataset. Hence, I'm first joining the sites inventory with a geospatial 
 # bluesky dataset.
-sf_history <- readRDS('./data/geobluesky.RDS')
+sf_history <- readRDS(file.path(PROJECT_DIR, './data/geobluesky.RDS'))
 sf_history <- st_transform(sf_history, crs=st_crs(map4))
 
 # Clean and join
