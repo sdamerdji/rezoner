@@ -43,8 +43,8 @@ ui <- fluidPage(
         h4('Select a rezoning proposal'),
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
-                                "Builder's Remedy (WIP)" = "BR",
-                                "April 2025 Family Rezoning (WIP)" = "F",
+                                "Builder's Remedy" = "BR",
+                                "April 2025 Family Rezoning" = "F",
                                 
                                 "Feb 2024 SF Planning Proposal" = "E",
                                 "Feb 2024 SF Planning Proposal + decontrol 4 stories in WRN" = "G",

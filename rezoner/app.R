@@ -408,16 +408,15 @@ server <- function(input, output, session) {
   user_rezoning <- reactiveValues(lists=list())
   
   # Update the reactive value whenever input features change
+
+  observeEvent(input$scenario, {
+    if (input$scenario %in% c("BR", 'yimby3')) {
+      updateSwitchInput(session, "stack_sdbl", value = TRUE)
+    }
+  })
   observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl), {
     if (input$years_slider <= 10 & input$years_slider >= 5){
       updatedData(update_df(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl))
-    }
-  })
-  observeEvent(input$scenario, {
-    if (input$scenario == "BR") {
-      updateSwitchInput(session, "stack_sdbl", value = TRUE)
-    } else {
-      updateSwitchInput(session, "stack_sdbl", value = FALSE)
     }
   })
   output$dynamicRezoneHeader <- renderUI({
@@ -580,7 +579,7 @@ server <- function(input, output, session) {
                          list(map = mapboxer_proxy("mainPlot"),
                               layer_id = LAYER_ID,
                               filter = c(list('in', 'mapblklot'), apns)))
-      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$net_units >= 1),]
+      to_plot <- to_plot[!duplicated(to_plot$mapblklot) & (to_plot$net_units >= 0.1),]
       
       apn_to_color <- unlist(unname(mapply(function(apn, color) c(apn, color), 
                                            to_plot$mapblklot, 
