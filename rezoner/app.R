@@ -413,6 +413,10 @@ server <- function(input, output, session) {
     if (input$scenario %in% c("BR", 'yimby3')) {
       updateSwitchInput(session, "stack_sdbl", value = TRUE)
     }
+    else if (input$scenario %in% c("E", "F", "G")) {
+      # force it off
+      updateSwitchInput(session, "stack_sdbl", value = FALSE)
+    }
   })
   observeEvent(c(input$scenario, input$years_slider, user_rezoning$lists, input$stack_sdbl), {
     if (input$years_slider <= 10 & input$years_slider >= 5){
