@@ -44,19 +44,10 @@ ui <- fluidPage(
         selectInput("scenario", NULL,
                     choices = c('Select' = 'blank',
                                 "Builder's Remedy" = "BR",
-                                "April 2025 Family Rezoning" = "F",
-                                
+                                "June 2025 Family Rezoning - Local" = "F",
+                                "June 2025 Family Rezoning - Base" = "H",
                                 "Feb 2024 SF Planning Proposal" = "E",
-                                "Feb 2024 SF Planning Proposal + decontrol 4 stories in WRN" = "G",
-                                
-                               # "Current SF Planning Proposal + decontrol 4 stories in WRN" = "F",
                                 "Fall 2023 SF Planning Proposal" = "D",
-                                
-                                #"Housing Element Rezoning A" = "A",
-                                #"Housing Element Rezoning B" = "B",
-                                #"Housing Element Rezoning C" = "C",
-                                #"Draft SF YIMBY Plan - No Decontrol in RH" = "yimby1", 
-                                #"Draft SF YIMBY Plan - Decontrol in RH" = "yimby2",
                                 "Example Plan" = "yimby3"),
                     selected = 'blank'),
 
