@@ -207,6 +207,7 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
   print(scenario)
   # TODO: Check that df$zp_ vars are the same each iteration even tho overwritten
   start <- Sys.time()
+  df['ZONING'] <- NA
   if (scenario == 'A') {
     df['ZONING'] <- df$M1_ZONING
     df['MAXDENS'] <- df$M1_MAXDENS
@@ -229,11 +230,11 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     df['ZONING'] <- df$BR_ZONING
   }
   if (scenario == 'F') {
-    df['ZONING'] <- df$M6_ZONING
+    df['ZONING'] <- df$M6_ZONING_local
     large_lot <- 8000
     large_lot_acres <- large_lot / 43560
     # df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > 0.1836547), 'M6_height'] <- 65
-    df[!is.na(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > large_lot_acres), 'M6_ZONING'] <- "65' Height Allowed"
+    df[!is.na(df$M6_ZONING_local) & (is.na(df$M6_height_local) | df$M6_height_local < 65) & (df$is_corner | df$ACRES > large_lot_acres), 'M6_ZONING_local'] <- "65' Height Allowed"
     
     # density decontrol in HRN
     # df[
@@ -247,7 +248,7 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
     #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
     #     !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
     #   & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
-    df['ZONING'] <- df$M6_ZONING
+    df['ZONING'] <- df$M6_ZONING_local
   }
   if (scenario == 'G') {
     df['ZONING'] <- df$M5_ZONING
@@ -264,6 +265,27 @@ update_df_ <- function(scenario, n_years, user_rezonings, stack_sdbl) {
       (df$affh2023 %in% c('High Resource', 'Highest Resource')) &
         !is.na(df$M5_ZONING) & (df$M5_ZONING == 'No height change, density decontrol')
       & !((df$ex_height2024 >= 45) & df$sb330_applies), 'ZONING'] <- "40' Height Allowed"
+  }
+  if (scenario == 'H') {
+    df['ZONING'] <- df$M6_ZONING_base
+    large_lot <- 8000
+    large_lot_acres <- large_lot / 43560
+    # df[!is.n a(df$M6_ZONING) & (is.na(df$M6_height) | df$M6_height < 65) & (df$is_corner | df$ACRES > 0.1836547), 'M6_height'] <- 65
+    # df[!is.na(df$M6_ZONING_base) & (is.na(df$M6_height_base) | df$M6_height_base < 65) & (df$is_corner | df$ACRES > large_lot_acres), 'M6_ZONING_base'] <- "65' Height Allowed"
+    
+    # density decontrol in HRN
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #   !is.na(df$M6_ZONING) & (df$M5_ZONING %in% density_restricted), 'M6_ZONING'] <-  "45' Height Allowed"
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #     is.na(df$M6_ZONING) & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <-  "45' Height Allowed"
+    # 
+    # df[
+    #   (df$affh2023 %in% c('High Resource', 'Highest Resource')) & 
+    #     !is.na(df$M6_ZONING) & (df$M6_ZONING == 'No height change, density decontrol')
+    #   & !((df$ex_height2024 >= 45) & df$sb330_applies), 'M6_ZONING'] <- "45' Height Allowed"
+    df['ZONING'] <- df$M6_ZONING_base
   }
   if (scenario == 'yimby3') {
     df <- yimbycity(df)
@@ -410,7 +432,7 @@ server <- function(input, output, session) {
   # Update the reactive value whenever input features change
 
   observeEvent(input$scenario, {
-    if (input$scenario %in% c("BR", 'yimby3')) {
+    if (input$scenario %in% c("BR", 'yimby3', 'H')) {
       updateSwitchInput(session, "stack_sdbl", value = TRUE)
     }
     else if (input$scenario %in% c("E", "F", "G")) {
@@ -810,12 +832,12 @@ server <- function(input, output, session) {
   
   output$dynamicLegend <- renderUI({
     if (input$map == "heights") {
-      layers <- c('55 feet (5 stories)',
-                  '65 feet (6 stories)',
-                  '85 feet (8 stories)',
-                  '140 feet (14 stories)',
-                  '240 feet (24 stories)',
-                  '300 feet (30 stories)'
+      layers <- c('5 stories',
+                  '6 stories',
+                  '8 stories',
+                  '14 stories',
+                  '24 stories',
+                  '30 stories'
       )
       colors <- c("#FDEBC9",
                   "#F4AD3E", 

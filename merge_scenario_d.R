@@ -14,7 +14,7 @@ merge_scenario <- function() {
 ######### Create a dataset for the Fall 2023 rezoning #############
 map4 <- st_read(file.path(PROJECT_DIR, 'Fall2023Rezoning.json'), promote_to_multi=F)
 map5 <- st_read(file.path(PROJECT_DIR, 'rezone_sites_1_2024.geojson'), promote_to_multi=F)
-map6 <- st_read(file.path(PROJECT_DIR, 'data/rezone_sites_4_2025.geojson'), promote_to_multi=F)
+map6 <- st_read(file.path(PROJECT_DIR, 'data/rezone_sites_5_2025.geojson'), promote_to_multi=F)
 map5 <- st_transform(map5, st_crs(map4))
 map6 <- st_transform(map6, st_crs(map4))
 
@@ -43,10 +43,17 @@ map5 <- map5 %>%
   select(-NEW_HEIGHT, -OBJECTID, -Shape__Area, -Shape__Length)
 
 map6 <- map6 %>%
-  mutate(M6_ZONING = NEW_HEIGHT) %>%
-  mutate(M6_height = as.numeric(str_extract(map6$NEW_HEIGHT, "\\d+"))) %>%
-  select(-NEW_HEIGHT, -OBJECTID, -height, -gen_hght, -Shape__Area, -Shape__Length)
-map6$M6_ZONING[map6$M6_ZONING == "Density decontrol, unchanged height"] <- "40' Height Allowed"
+  mutate(M6_ZONING_local = NEW_HEIGHT) %>%
+  mutate(M6_height_local = as.numeric(str_extract(map6$NEW_HEIGHT, "\\d+"))) %>%
+  mutate(M6_height_base = as.numeric(str_extract(map6$Base, "\\d+"))) %>%
+  mutate(M6_ZONING_base = as.numeric(str_extract(map6$Base, "\\d+"))) %>%
+  select(-NEW_HEIGHT, -OBJECTID, -height, -Shape__Area, -Shape__Length)
+
+# Only keep the numbers for base zoning for parcels that actually got base density upzoned in the June 2025 plan
+map6$M6_ZONING_base[map6$M6_ZONING_local == "Density decontrol only"] <- NA
+map6$M6_ZONING_base[map6$M6_ZONING_local == "40' Height Allowed"] <- NA
+map6$M6_ZONING_base[map6$M6_height_base == map6$gen_hght] <- NA
+map6$M6_ZONING_local[map6$M6_ZONING_local == "Density decontrol, unchanged height"] <- "40' Height Allowed"
 
 
 map4 <- map4[!duplicated(map4), ]
@@ -64,7 +71,7 @@ new_map <- full_join(as.data.frame(map5),
                       by=c('mapblklot', 'ACRES'),
                       suffix=c('map5', 'map4'))
 new_map <- full_join(new_map, 
-                     as.data.frame(map6[!is.na(map6$M6_ZONING),]),
+                     as.data.frame(map6[!is.na(map6$M6_ZONING_local) | !is.na(map6$M6_ZONING_base),]),
                      by=c('mapblklot', 'ACRES'),
                      suffix=c('', 'map6'))
 new_map <- rename(new_map,'geometrymap6' = 'geometry')
@@ -162,6 +169,11 @@ final$M5_ZONING[
   (final$mapblklot %in% intersections$mapblklot) 
   & is.na(final$M5_ZONING)
 ] <- fourplex_description
+intersections <- st_join(final[is.na(final$M6_ZONING_base),], fourplex, left=F)
+final$M6_ZONING_base[
+  (final$mapblklot %in% intersections$mapblklot) 
+  & is.na(final$M6_ZONING_base)
+] <- fourplex_description
 
 fourOrSixPlex = 'Increased density up to four units (six units on corner lots)'
 final[!is.na(final$M1_ZONING) & final$M1_ZONING == fourOrSixPlex, 'M1_ZONING'] <- fourplex_description
@@ -186,6 +198,7 @@ final[!is.na(final$M2_ZONING) & final$M2_ZONING == fourplex_description & final$
 final[!is.na(final$M3_ZONING) & final$M3_ZONING == fourplex_description & final$is_corner, 'M3_ZONING'] <- sixplex_description
 final[!is.na(final$M4_ZONING) & final$M4_ZONING == fourplex_description & final$is_corner, 'M4_ZONING'] <- sixplex_description
 final[!is.na(final$M5_ZONING) & final$M5_ZONING == fourplex_description & final$is_corner, 'M5_ZONING'] <- sixplex_description
+final[!is.na(final$M6_ZONING_base) & final$M6_ZONING_base == fourplex_description & final$is_corner, 'M6_ZONING_base'] <- sixplex_description
 
 final <- st_sf(final)
 final <- st_transform(final[1:nrow(final),], crs = 4326)
