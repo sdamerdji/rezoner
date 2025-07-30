@@ -21,6 +21,20 @@ mullin_density <- 30
 df['mullin'] <- 1.5 * mullin_density
 df['housing_element'] <- pmax(df$M1_MAXDENS, df$M2_MAXDENS, df$M3_MAXDENS, na.rm=T)
 
+centroid_join <- function(parcels_df, auxiliary_df) {
+  init_nrows <- nrow(parcels_df)
+  centroids <- st_point_on_surface(parcels_df)
+  centroids['id'] <-  1:nrow(centroids)
+  auxiliary_df <- st_transform(auxiliary_df, st_crs(parcels_df))
+  result <- st_join(centroids, auxiliary_df, join = st_intersects) %>%
+    group_by(id) %>%
+    slice(1) %>%
+    ungroup()
+  result$geometry <- parcels_df$geometry
+  final_nrows <- nrow(result)
+  assertthat::are_equal(init_nrows, final_nrows)
+  return(dplyr::select(result, -id))
+}
 
 # I used conservative version of sb 9 that only allows 3 units
 # TODO: add a toggle to make less conservative (low priority)
@@ -67,7 +81,7 @@ half_mile_transit <- half_mile_transit[half_mile_transit$agency_primary == 'City
 
 low_vmt <- read_sf('../data/below15vmt.geojson')
 low_vmt_intersections <- st_join(df, low_vmt, left=F)
-half_mile_transit_intersections <- st_join(df, half_mile_transit, left=F)
+half_mile_transit_intersections <- centroid_join(df, half_mile_transit)
 df['low_vmt'] <-  F
 df['half_mile_transit'] <- F
 df[(df$mapblklot %in% low_vmt_intersections$mapblklot), 'low_vmt'] <- T
