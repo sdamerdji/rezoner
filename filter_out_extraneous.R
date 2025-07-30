@@ -1,5 +1,6 @@
 library(dplyr)
 library(sf)
+
 source('./constants.R')
 
 parcels_to_exclude <- c('State of California Property', 'Under Water Lot')
@@ -56,6 +57,7 @@ filtered[!is.na(filtered$M2_ZONING) & (filtered$M2_ZONING %in% c(fourplex, sixpl
 filtered[!is.na(filtered$M3_ZONING) & (filtered$M3_ZONING %in% c(fourplex, sixplex)) & filtered$ex_height2024 > 65, 'M3_ZONING'] <- NA
 filtered[!is.na(filtered$M4_ZONING) & (filtered$M4_ZONING %in% c(fourplex, sixplex)) & filtered$ex_height2024 > 65, 'M4_ZONING'] <- NA
 filtered[!is.na(filtered$M5_ZONING) & (filtered$M5_ZONING %in% c(fourplex, sixplex)) & filtered$ex_height2024 > 65, 'M5_ZONING'] <- NA
+filtered[!is.na(filtered$M6_ZONING_base) & (filtered$M6_ZONING_base %in% c(fourplex, sixplex)) & filtered$ex_height2024 > 65, 'M6_ZONING_base'] <- NA
 
 
 # Remove lots under highways
